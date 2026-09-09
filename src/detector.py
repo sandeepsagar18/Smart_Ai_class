@@ -19,7 +19,7 @@ class FaceDetector:
                     model=str(YUNET_MODEL_PATH),
                     config="",
                     input_size=(640, 480),
-                    score_threshold=max(0.55, CONFIDENCE_THRESHOLD),
+                    score_threshold=0.70,
                     nms_threshold=0.30,
                     top_k=50
                 )

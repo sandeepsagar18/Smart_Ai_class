@@ -15,7 +15,7 @@ class FaceRecognizer:
         self.model_name = "ArcFace"
         self.known_embeddings = {}
         self.centroids = {}
-        self.threshold = 0.35
+        self.threshold = 0.32
 
         if EMBEDDINGS_FILE.exists():
             with open(EMBEDDINGS_FILE, "rb") as f:
@@ -38,7 +38,9 @@ class FaceRecognizer:
             self.centroids[roll] = c
 
     def train_system(self):
-        print(f"\n[INFO] Training High-Definition {self.model_name} Engine...")
+        from src.detector import FaceDetector
+        print(f"\n[INFO] Training High-Definition {self.model_name} Engine with True Face Cropping...")
+        detector = FaceDetector()
         embeddings_dict = {}
 
         for student_folder in os.listdir(KNOWN_FACES_DIR):
@@ -51,7 +53,12 @@ class FaceRecognizer:
             for img_file in os.listdir(folder_path):
                 img_path = str(folder_path / img_file)
                 try:
-                    res = DeepFace.represent(img_path, model_name=self.model_name, enforce_detection=False)
+                    raw_img = cv2.imread(img_path)
+                    if raw_img is None: continue
+                    _, faces = detector.detect_faces(raw_img)
+                    face_crop = faces[0]["image"] if faces else raw_img
+
+                    res = DeepFace.represent(face_crop, model_name=self.model_name, enforce_detection=False)
                     if len(res) > 0:
                         embeddings_dict[roll_number].append(res[0]["embedding"])
                 except Exception as e:
@@ -64,28 +71,32 @@ class FaceRecognizer:
         self._compute_centroids()
         print(f"[SUCCESS] Training complete! Loaded {len(self.known_embeddings)} students with centroid profiles into HD memory.")
 
-    def _match_single_embedding(self, live_embedding):
+    def _match_single_embedding(self, live_embedding, candidate_rolls=None):
         live_norm = live_embedding / (np.linalg.norm(live_embedding) + 1e-10)
         best_match = "Unknown"
         best_distance = float("inf")
 
-        for roll_number, centroid in self.centroids.items():
-            # 1. Compare against master centroid vector
-            c_dist = 1.0 - float(np.dot(live_norm, centroid))
-            
-            # 2. Also check individual pose variations for side tilts
-            min_pose_dist = c_dist
-            if roll_number in self.known_embeddings:
-                for saved_emb in self.known_embeddings[roll_number]:
-                    saved_norm = np.array(saved_emb) / (np.linalg.norm(saved_emb) + 1e-10)
-                    p_dist = 1.0 - float(np.dot(live_norm, saved_norm))
-                    if p_dist < min_pose_dist:
-                        min_pose_dist = p_dist
+        # Prioritize section candidates if available
+        search_centroids = self.centroids
+        if candidate_rolls:
+            candidate_set = set(map(str, candidate_rolls))
+            # First pass: check section candidates
+            for roll in candidate_set:
+                if roll in self.centroids:
+                    c_dist = 1.0 - float(np.dot(live_norm, self.centroids[roll]))
+                    if c_dist < best_distance:
+                        best_distance = c_dist
+                        best_match = roll
 
-            # Blend centroid and closest pose for optimal robustness
-            effective_dist = min(c_dist, min_pose_dist)
-            if effective_dist < best_distance:
-                best_distance = effective_dist
+            if best_distance < self.threshold:
+                confidence = round((1 - (best_distance / self.threshold)) * 100, 2)
+                return best_match, confidence
+
+        # Full database scan if not resolved
+        for roll_number, centroid in search_centroids.items():
+            c_dist = 1.0 - float(np.dot(live_norm, centroid))
+            if c_dist < best_distance:
+                best_distance = c_dist
                 best_match = roll_number
 
         if best_distance < self.threshold:
@@ -104,11 +115,11 @@ class FaceRecognizer:
             if len(res) == 0: return "Unknown", 0.0
 
             live_embedding = np.array(res[0]["embedding"])
-            return self._match_single_embedding(live_embedding)
+            return self._match_single_embedding(live_embedding, candidate_rolls=candidate_rolls)
         except Exception:
             return "Unknown", 0.0
 
-    def recognize_batch(self, face_crops):
+    def recognize_batch(self, face_crops, candidate_rolls=None):
         """
         Batch vectorized ArcFace inference:
         Processes multiple face crops in a single forward pass for high-speed crowd attendance.
@@ -133,8 +144,8 @@ class FaceRecognizer:
             for res_idx, orig_idx in enumerate(valid_indices):
                 if res_idx < len(batch_results):
                     emb = np.array(batch_results[res_idx]["embedding"])
-                    output[orig_idx] = self._match_single_embedding(emb)
+                    output[orig_idx] = self._match_single_embedding(emb, candidate_rolls=candidate_rolls)
             return output
         except Exception:
             # Fallback to single recognition on error
-            return [self.recognize(c) for c in face_crops]
+            return [self.recognize(c, candidate_rolls=candidate_rolls) for c in face_crops]

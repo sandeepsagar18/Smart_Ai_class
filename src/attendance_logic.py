@@ -178,9 +178,9 @@ def start_attendance(subject_info=None):
 
             valid_live_crops.append(face_crop)
 
-        # High-Speed Vectorized Batch ArcFace Inference per shot
+        # High-Speed Vectorized Batch ArcFace Inference per shot with section-awareness
         if valid_live_crops:
-            batch_matches = recognizer.recognize_batch(valid_live_crops)
+            batch_matches = recognizer.recognize_batch(valid_live_crops, candidate_rolls=enrolled_roll_numbers)
             for roll_number, confidence in batch_matches:
                 if roll_number != "Unknown":
                     student_detections[roll_number] = student_detections.get(roll_number, 0) + 1
