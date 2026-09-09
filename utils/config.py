@@ -32,9 +32,9 @@ ARCFACE_SIMILARITY_THRESHOLD = 0.65 # Cosine similarity required to verify ident
 AMBIGUITY_MARGIN = 0.06          # Minimum separation between top-1 and top-2 candidate similarities
 
 # Temporal Consensus & Attendance Logic
-TOTAL_CAPTURE_SHOTS = 7          # Total multi-angle shots per session
-REQUIRED_CONSISTENT_VOTES = 3    # Required matching votes out of total shots (3 of 7)
-SHOT_COUNTDOWN_SECONDS = 1.2     # Countdown interval between shots
+TOTAL_CAPTURE_SHOTS = 10         # Total multi-angle shots per session
+REQUIRED_CONSISTENT_VOTES = 5    # Minimum 5 matching images required out of 10 shots to mark attendance
+SHOT_COUNTDOWN_SECONDS = 2.5     # Countdown interval between shots (10 shots * 2.5s = 25 seconds total capture window)
 
 # Features
 ENABLE_5POINT_ALIGNMENT = True   # Standard ArcFace 112x112 affine transformation
