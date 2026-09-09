@@ -1,4 +1,4 @@
-﻿import os
+import os
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.units import inch
@@ -182,20 +182,20 @@ def generate_pdf(filename="SmartClass_Vision_Project_Documentation.pdf"):
         ],
         [
             Paragraph("<b>Face Detection</b>", table_cell_style),
-            Paragraph("Ultralytics YOLOv8n", table_cell_style),
-            Paragraph("Single-stage Deep CNN object detector. Detects and tracks faces across varying lighting and classroom angles.", table_cell_style),
-            Paragraph("Bounding boxes [x1, y1, x2, y2] & cropped faces", table_cell_style)
+            Paragraph("OpenCV YuNet DNN", table_cell_style),
+            Paragraph("Dedicated Deep Neural Network for human face detection and 5-point landmark alignment. Filters out non-human background objects.", table_cell_style),
+            Paragraph("Bounding boxes [x1, y1, x2, y2] & 5-point landmarks", table_cell_style)
         ],
         [
             Paragraph("<b>Biometric Embedding</b>", table_cell_style),
-            Paragraph("FaceNet512 (DeepFace)", table_cell_style),
-            Paragraph("Deep Metric Learning trained on Triplet Loss. Maps facial geometry into a dense 512-dimensional Euclidean hyperspace.", table_cell_style),
-            Paragraph("512-D continuous floating-point vector", table_cell_style)
+            Paragraph("ArcFace (DeepFace)", table_cell_style),
+            Paragraph("Additive Angular Margin Loss deep neural network. Maps facial features into a 512-dimensional angular hyperspace.", table_cell_style),
+            Paragraph("512-D continuous normalized floating-point vector", table_cell_style)
         ],
         [
             Paragraph("<b>Face Identification</b>", table_cell_style),
-            Paragraph("Cosine Distance Metric", table_cell_style),
-            Paragraph("Computes Cosine Similarity: <i>cos(u, v) = (u . v) / (||u|| ||v||)</i>. Compares live embedding against saved student vectors. Threshold: &lt; 0.25.", table_cell_style),
+            Paragraph("Cosine Similarity Metric", table_cell_style),
+            Paragraph("Computes Cosine Similarity: <i>cos(u, v) = (u . v) / (||u|| ||v||)</i> against centroid profiles with ambiguity margin gating.", table_cell_style),
             Paragraph("Roll Number & Match Confidence %", table_cell_style)
         ],
         [
@@ -245,7 +245,7 @@ def generate_pdf(filename="SmartClass_Vision_Project_Documentation.pdf"):
         [Paragraph("Layer", table_header_style), Paragraph("Technology", table_header_style), Paragraph("Role", table_header_style)],
         [Paragraph("GUI Framework", table_cell_style), Paragraph("CustomTkinter, Tkinter", table_cell_style), Paragraph("Desktop interface with dark mode and kiosk layout", table_cell_style)],
         [Paragraph("Computer Vision", table_cell_style), Paragraph("OpenCV (cv2), Pillow (PIL)", table_cell_style), Paragraph("Real-time webcam stream, DirectShow capture, face crops", table_cell_style)],
-        [Paragraph("Deep Learning", table_cell_style), Paragraph("PyTorch, TensorFlow, DeepFace, YOLOv8", table_cell_style), Paragraph("Face detection inference and FaceNet512 512-D embeddings", table_cell_style)],
+        [Paragraph("Deep Learning", table_cell_style), Paragraph("PyTorch, TensorFlow, DeepFace, ArcFace, YuNet", table_cell_style), Paragraph("YuNet face detection and ArcFace 512-D embeddings", table_cell_style)],
         [Paragraph("Database", table_cell_style), Paragraph("SQLite3, Pandas, Pickle", table_cell_style), Paragraph("Master database, attendance exports, binary embedding storage", table_cell_style)],
         [Paragraph("Security", table_cell_style), Paragraph("HMAC-SHA256, Salted Hashes", table_cell_style), Paragraph("Argon2/PBKDF2 style hashing, attendance file tamper detection", table_cell_style)]
     ]
