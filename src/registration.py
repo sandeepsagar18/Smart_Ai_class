@@ -1,6 +1,7 @@
 import cv2
 import time
 import shutil
+import numpy as np
 from pathlib import Path
 from src.database import add_student, delete_student, student_exists, get_student_info
 from src.detector import FaceDetector
@@ -113,30 +114,82 @@ def register_student(roll_number, name, gender, degree, year, branch, section):
         processed_frame, cropped_faces = detector.detect_faces(frame)
         is_aligned = False
         captured_crop = None
+        quality_passed = False
+        quality_msg = ""
+        quality_score = 0
 
         if len(cropped_faces) == 1:
             fx1, fy1, fx2, fy2 = cropped_faces[0]["coords"]
+            fw, fh = (fx2 - fx1), (fy2 - fy1)
+
             # Dynamic crop with 30% padding around detected face
-            pad_w = int((fx2 - fx1) * 0.3)
-            pad_h = int((fy2 - fy1) * 0.4)
+            pad_w = int(fw * 0.3)
+            pad_h = int(fh * 0.4)
             cx1 = max(0, fx1 - pad_w)
             cy1 = max(0, fy1 - pad_h)
             cx2 = min(w, fx2 + pad_w)
             cy2 = min(h, fy2 + int(pad_h * 0.4))
 
             captured_crop = clean_frame[cy1:cy2, cx1:cx2]
-            is_aligned = True
-            color = (0, 255, 0)
-            msg = "Face Locked! Press 'C' or Spacebar to Capture"
 
-            # Draw green box around student face
+            # -------------------------------------------------------------
+            # QUALITY ASSESSMENT ENGINE
+            # -------------------------------------------------------------
+            # 1. Blur Detection (Laplacian Variance)
+            face_gray = cv2.cvtColor(clean_frame[fy1:fy2, fx1:fx2], cv2.COLOR_BGR2GRAY)
+            blur_val = cv2.Laplacian(face_gray, cv2.CV_64F).var()
+            blur_pass = blur_val >= 80.0
+
+            # 2. Lighting / Brightness Analysis (Average Luma)
+            avg_brightness = float(np.mean(face_gray))
+            light_pass = (50 <= avg_brightness <= 210)
+
+            # 3. Face Resolution / Distance Check (Min face width)
+            size_pass = fw >= 110 and fh >= 110
+
+            # 4. Center Alignment Check (Face not cut at edges)
+            margin = 25
+            pos_pass = (fx1 > margin and fy1 > margin and fx2 < (w - margin) and fy2 < (h - margin))
+
+            # Composite quality determination
+            if not size_pass:
+                quality_msg = "Come Closer: Face too small in frame"
+                color = (0, 165, 255)
+            elif not light_pass:
+                if avg_brightness < 50:
+                    quality_msg = "Poor Lighting: Face too dark! Move into better light"
+                else:
+                    quality_msg = "Overexposed: Too much harsh light on face"
+                color = (0, 165, 255)
+            elif not blur_pass:
+                quality_msg = f"Motion Blur Detected (Sharpness: {int(blur_val)}/80) - Hold Still!"
+                color = (0, 165, 255)
+            elif not pos_pass:
+                quality_msg = "Center Your Face in Camera Frame"
+                color = (0, 165, 255)
+            else:
+                quality_passed = True
+                is_aligned = True
+                color = (0, 255, 0)
+                quality_msg = f"PERFECT QUALITY (Sharpness: {int(blur_val)}) - Press 'C' or Spacebar"
+
+            # Draw bounding box and quality stats
             cv2.rectangle(processed_frame, (fx1, fy1), (fx2, fy2), color, 3)
             cv2.circle(processed_frame, ((fx1 + fx2) // 2, (fy1 + fy2) // 2), 4, color, -1)
+
+            # Quality meter overlay
+            badge_text = f"Sharpness: {int(blur_val)} | Light: {int(avg_brightness)}"
+            cv2.rectangle(processed_frame, (fx1, fy2 + 5), (fx1 + 240, fy2 + 30), (20, 20, 20), -1)
+            cv2.putText(processed_frame, badge_text, (fx1 + 6, fy2 + 22),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255) if quality_passed else (0, 165, 255), 1)
+
+            msg = quality_msg
+
         elif len(cropped_faces) > 1:
             msg = "Multiple faces detected! Only 1 student allowed in frame."
             color = (0, 0, 255)
         else:
-            msg = "Looking for student face... Please face the camera"
+            msg = "Looking for student face... Please face the camera directly"
             color = (0, 165, 255)
 
         # Header Info Banner
@@ -149,13 +202,13 @@ def register_student(roll_number, name, gender, degree, year, branch, section):
         # Status text in center
         cv2.rectangle(processed_frame, (10, h - 85), (w - 10, h - 50), (20, 20, 20), -1)
         cv2.putText(processed_frame, msg, (20, h - 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, color, 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.60, color, 2)
 
         # Footer Hint Banner
         cv2.rectangle(processed_frame, (0, h - 45), (w, h), (15, 15, 15), -1)
-        hint = "Press 'C' or Spacebar to Capture  |  Press 'Q' or ESC to Cancel"
+        hint = "Press 'C' or Spacebar to Capture (Green Only)  |  Press 'Q' or ESC to Cancel"
         cv2.putText(processed_frame, hint, (20, h - 16),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if is_aligned else (180, 180, 180), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0) if quality_passed else (180, 180, 180), 2)
 
         cv2.imshow(win_title, processed_frame)
         key = cv2.waitKey(20) & 0xFF
@@ -166,16 +219,27 @@ def register_student(roll_number, name, gender, degree, year, branch, section):
         if is_cancel_key:
             aborted = True
             break
-        elif is_capture_key and is_aligned and captured_crop is not None and captured_crop.size > 0:
-            img_path = student_dir / f"{roll_number}_{count}.jpg"
-            cv2.imwrite(str(img_path), captured_crop)
-            count += 1
-            # Visual feedback on capture
-            flash = processed_frame.copy()
-            cv2.putText(flash, f"Pose {count}/5 CAPTURED!", (w // 4, h // 2),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 255, 0), 3)
-            cv2.imshow(win_title, flash)
-            cv2.waitKey(300)
+        elif is_capture_key:
+            if not quality_passed:
+                # Disallow capture if photo quality threshold is not met!
+                err_flash = processed_frame.copy()
+                cv2.rectangle(err_flash, (w // 6, h // 3), (5 * w // 6, h // 3 + 80), (0, 0, 180), -1)
+                cv2.putText(err_flash, "PHOTO QUALITY REJECTED!", (w // 6 + 20, h // 3 + 35),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+                cv2.putText(err_flash, quality_msg, (w // 6 + 20, h // 3 + 65),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 255, 255), 1)
+                cv2.imshow(win_title, err_flash)
+                cv2.waitKey(600)
+            elif captured_crop is not None and captured_crop.size > 0:
+                img_path = student_dir / f"{roll_number}_{count}.jpg"
+                cv2.imwrite(str(img_path), captured_crop)
+                count += 1
+                # Visual feedback on capture
+                flash = processed_frame.copy()
+                cv2.putText(flash, f"Pose {count}/5 CAPTURED (HD QUALIFIED)!", (w // 6, h // 2),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.95, (0, 255, 0), 3)
+                cv2.imshow(win_title, flash)
+                cv2.waitKey(350)
 
     cap.release()
     cv2.destroyAllWindows()
