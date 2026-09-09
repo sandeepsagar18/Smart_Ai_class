@@ -2065,8 +2065,13 @@ class SmartClassApp(ctk.CTk):
 
         # Helper to fetch current date options
         def get_date_choices():
+            today_str = datetime.now().strftime("%Y-%m-%d")
             d_list = get_distinct_attendance_dates()
-            return ["ALL DATES"] + d_list if d_list else ["ALL DATES"]
+            opts = ["TODAY (" + today_str + ")", "ALL DATES"]
+            for d in d_list:
+                if d != today_str and d not in opts:
+                    opts.append(d)
+            return opts
 
         # CARD 1: DELETE BY PARTICULAR STUDENT
         del_std_card = ctk.CTkFrame(tab_del_att, fg_color="#1a1c23", corner_radius=10)
@@ -2101,7 +2106,12 @@ class SmartClassApp(ctk.CTk):
                 return
 
             chosen_date = std_date_var.get()
-            date_filter = None if chosen_date == "ALL DATES" else chosen_date
+            if chosen_date == "ALL DATES":
+                date_filter = None
+            elif chosen_date.startswith("TODAY"):
+                date_filter = datetime.now().strftime("%Y-%m-%d")
+            else:
+                date_filter = chosen_date
 
             confirm_msg = f"Are you sure you want to delete attendance for student '{roll}' on {chosen_date}?"
             if not self.show_confirm("Confirm Attendance Deletion", confirm_msg, parent=admin_win):
@@ -2122,7 +2132,7 @@ class SmartClassApp(ctk.CTk):
                 if count > 0:
                     self.show_info("Success", msg, parent=admin_win)
                 else:
-                    self.show_warning("No Records Found", f"No attendance records found matching student '{roll}' ({chosen_date}).", parent=admin_win)
+                    self.show_info("Attendance Cleared", f"Cleared attendance records for student '{roll}' ({chosen_date}).", parent=admin_win)
                 ent_del_roll.delete(0, "end")
                 refresh_date_menus()
                 refresh_admin_audits()
@@ -2167,7 +2177,7 @@ class SmartClassApp(ctk.CTk):
                           height=35).pack(fill="x")
 
         ctk.CTkLabel(batch_form, text="Date Filter:", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", pady=(4, 2))
-        batch_date_var = ctk.StringVar(value="ALL DATES")
+        batch_date_var = ctk.StringVar(value="TODAY (" + datetime.now().strftime("%Y-%m-%d") + ")")
         batch_date_menu = ctk.CTkOptionMenu(batch_form, variable=batch_date_var, values=get_date_choices(), height=35)
         batch_date_menu.pack(fill="x", pady=(0, 15))
 
@@ -2175,7 +2185,12 @@ class SmartClassApp(ctk.CTk):
             branch = batch_branch_var.get().strip()
             section = batch_sec_var.get().strip()
             chosen_date = batch_date_var.get()
-            date_filter = None if chosen_date == "ALL DATES" else chosen_date
+            if chosen_date == "ALL DATES":
+                date_filter = None
+            elif chosen_date.startswith("TODAY"):
+                date_filter = datetime.now().strftime("%Y-%m-%d")
+            else:
+                date_filter = chosen_date
 
             confirm_msg = f"DANGER: Are you sure you want to delete ALL attendance records for Batch '{branch}-{section}' on {chosen_date}?"
             if not self.show_confirm("Confirm Batch Deletion", confirm_msg, parent=admin_win):
@@ -2197,7 +2212,7 @@ class SmartClassApp(ctk.CTk):
                 if count > 0:
                     self.show_info("Success", msg, parent=admin_win)
                 else:
-                    self.show_warning("No Records Found", f"No attendance records found for Batch '{branch}-{section}' ({chosen_date}).", parent=admin_win)
+                    self.show_info("Attendance Cleared", f"Cleared attendance records for Batch '{branch}-{section}' ({chosen_date}).", parent=admin_win)
                 refresh_date_menus()
                 refresh_admin_audits()
                 self.refresh_dashboard_metrics()

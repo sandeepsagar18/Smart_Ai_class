@@ -5,9 +5,10 @@ import secrets
 import pickle
 import shutil
 import socket
+import pandas as pd
 from pathlib import Path
 from datetime import datetime, timedelta
-from utils.config import BASE_DIR
+from utils.config import BASE_DIR, ATTENDANCE_DIR
 
 DB_PATH = BASE_DIR / "data" / "smartclass.db"
 EMB_PATH = BASE_DIR / "data" / "embeddings.pkl"
@@ -742,6 +743,33 @@ def delete_attendance_by_student(roll_number, requesting_user=None, password=Non
     conn.commit()
     conn.close()
 
+    # Also clean CSV files in ATTENDANCE_DIR matching date_filter (or today if not specified)
+    if ATTENDANCE_DIR.exists():
+        target_dates = []
+        if date_filter and date_filter != "ALL":
+            target_dates.append(date_filter.replace("-", ""))
+        else:
+            # Check all dates or all csv files
+            target_dates = None
+
+        csv_files = list(ATTENDANCE_DIR.glob("*.csv"))
+        for csv_file in csv_files:
+            try:
+                # If target_dates specified, check filename or file content date
+                if target_dates and not any(d in csv_file.name for d in target_dates):
+                    continue
+                df = pd.read_csv(csv_file)
+                if 'Roll Number' in df.columns:
+                    original_len = len(df)
+                    df = df[df['Roll Number'].astype(str).str.strip().str.upper() != str(roll_number).strip().upper()]
+                    if len(df) < original_len:
+                        if len(df) == 0:
+                            csv_file.unlink(missing_ok=True)
+                        else:
+                            df.to_csv(csv_file, index=False)
+            except Exception:
+                pass
+
     admin_id = requesting_user.get("employee_id", "ADMIN") if requesting_user else "SYSTEM"
     log_security_event("ATTENDANCE_DELETED", "WARNING", admin_id,
                        f"Deleted {deleted_count} attendance records for student '{roll_number}' (Date: {date_filter or 'ALL'})")
@@ -751,7 +779,7 @@ def delete_attendance_by_student(roll_number, requesting_user=None, password=Non
 def delete_attendance_by_batch(branch, section, date_filter=None, subject_id_filter=None, requesting_user=None, password=None):
     """
     Deletes attendance records for a particular batch (branch and section).
-    Optionally filters by date or subject.
+    Optionally filters by date or subject. Also purges matching entries from CSV records.
     """
     init_db()
     if requesting_user and password:
@@ -777,10 +805,46 @@ def delete_attendance_by_batch(branch, section, date_filter=None, subject_id_fil
     conn.commit()
     conn.close()
 
+    # Also clean CSV files in ATTENDANCE_DIR matching branch, section, and date_filter
+    if ATTENDANCE_DIR.exists():
+        target_dates = []
+        if date_filter and date_filter != "ALL":
+            target_dates.append(date_filter.replace("-", ""))
+        else:
+            target_dates = None
+
+        csv_files = list(ATTENDANCE_DIR.glob("*.csv"))
+        for csv_file in csv_files:
+            try:
+                if target_dates and not any(d in csv_file.name for d in target_dates):
+                    continue
+                # If filename has exact matching branch and section pattern, e.g. Attendance_CS-303_CSE_C_20260909_111010.csv
+                fname_upper = csv_file.name.upper()
+                batch_tag = f"_{branch.strip().upper()}_{section.strip().upper()}_"
+                if batch_tag in fname_upper:
+                    csv_file.unlink(missing_ok=True)
+                    continue
+
+                # Or inspect rows inside CSV
+                df = pd.read_csv(csv_file)
+                if 'Branch' in df.columns and 'Section' in df.columns:
+                    original_len = len(df)
+                    mask = (df['Branch'].astype(str).str.strip().str.upper() == str(branch).strip().upper()) & \
+                           (df['Section'].astype(str).str.strip().str.upper() == str(section).strip().upper())
+                    df = df[~mask]
+                    if len(df) < original_len:
+                        if len(df) == 0:
+                            csv_file.unlink(missing_ok=True)
+                        else:
+                            df.to_csv(csv_file, index=False)
+            except Exception:
+                pass
+
     admin_id = requesting_user.get("employee_id", "ADMIN") if requesting_user else "SYSTEM"
     log_security_event("ATTENDANCE_BATCH_DELETED", "WARNING", admin_id,
                        f"Deleted {deleted_count} attendance records for Batch '{branch}-{section}' (Date: {date_filter or 'ALL'})")
     return True, f"Successfully deleted {deleted_count} attendance records for Batch {branch}-{section}.", deleted_count
+
 
 
 # SYSTEM DIAGNOSTICS
