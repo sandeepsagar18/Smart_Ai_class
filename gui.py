@@ -2558,20 +2558,30 @@ class SmartClassApp(ctk.CTk):
             teacher = subject_info.get("teacher_name", "")
             hmac_sig = result.get("hmac_signature")
 
+            verified_list = result.get("verified_students", []) if isinstance(result, dict) else []
+            names_summary = ""
+            if verified_list:
+                names_summary = "\n\n🎓 Verified Students:\n" + "\n".join(
+                    [f"  • {s['name']} ({s['roll']}) - {s['time']}" for s in verified_list[:12]]
+                )
+                if len(verified_list) > 12:
+                    names_summary += f"\n  ...and {len(verified_list) - 12} more students."
+
             msg = (
                 f"Batch Attendance Completed!\n\n"
                 f"Subject: {sub_code} ({br} - Section {sec})\n"
                 f"Faculty: {teacher}\n"
                 f"Section Enrolled: {enrolled}\n\n"
                 f"✅ Verified Present: {verified} students\n"
-                f"❌ Wrong Section Discarded: {rejected} students\n"
+                f"❌ Wrong Section Discarded: {rejected} students"
+                f"{names_summary}\n"
             )
             if spoofs > 0:
-                msg += f"🚨 Spoof Attacks Blocked: {spoofs} (Audit snapshots saved)\n"
+                msg += f"\n🚨 Spoof Attacks Blocked: {spoofs} (Audit snapshots saved)\n"
             if hmac_sig:
                 msg += f"🔏 HMAC Signature: {hmac_sig[:12]}... (Tamper-Proof)\n"
             msg += "\nAttendance sheet saved and Section Roster updated."
-            self.show_info("Attendance Finished", msg)
+            self.show_info("Attendance Verified & Updated", msg)
 
 
 if __name__ == "__main__":

@@ -73,11 +73,9 @@ def start_attendance(subject_info=None):
     # Force High Definition
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-    time.sleep(2)
-
     NUM_SHOTS = 3
     REQUIRED_MATCHES = 2
-    SHOT_INTERVAL = 1.2
+    SHOT_INTERVAL = 2.5
     captured_frames = []
 
     # Extract target section student roll numbers for context-aware priority matching
@@ -276,5 +274,7 @@ def start_attendance(subject_info=None):
         "spoofs_rejected": spoof_incidents,
         "enrolled_total": enrolled_count,
         "filename": filename,
-        "hmac_signature": hmac_sig
+        "hmac_signature": hmac_sig,
+        "verified_students": [{"roll": a["Roll Number"], "name": a["Name"], "time": a["Time Marked"]} for a in attendance_list],
+        "rejected_students": rejected_wrong_section
     }
