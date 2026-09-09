@@ -635,15 +635,31 @@ def delete_student_secure(roll_number, requesting_user, password):
     return True, f"Student {roll_number} deleted successfully."
 
 
-# ATTENDANCE PERSISTENCE & AUDIT LOGS
+# ATTENDANCE PERSISTENCE & AUDIT LOGS (WITH STEP 8 DEDUPLICATION LOCK)
 def save_attendance_entry(subject_id, subject_code, subject_name, teacher_name, roll_number, name, branch, section, date, time_marked, status="Present"):
     init_db()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    
+    # Step 8: Deduplication check: Has student already been marked present for this subject on this date?
     cursor.execute('''
-        INSERT INTO attendance_records (subject_id, subject_code, subject_name, teacher_name, roll_number, name, branch, section, date, time_marked, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (subject_id, subject_code, subject_name, teacher_name, roll_number, name, branch, section, date, time_marked, status))
+        SELECT id FROM attendance_records
+        WHERE roll_number = ? AND subject_id = ? AND date = ?
+    ''', (str(roll_number), subject_id, date))
+    existing = cursor.fetchone()
+
+    if existing:
+        # Update timestamp to latest verification rather than creating duplicate row
+        cursor.execute('''
+            UPDATE attendance_records
+            SET time_marked = ?, status = ?
+            WHERE id = ?
+        ''', (time_marked, status, existing[0]))
+    else:
+        cursor.execute('''
+            INSERT INTO attendance_records (subject_id, subject_code, subject_name, teacher_name, roll_number, name, branch, section, date, time_marked, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (subject_id, subject_code, subject_name, teacher_name, roll_number, name, branch, section, date, time_marked, status))
     conn.commit()
     conn.close()
 

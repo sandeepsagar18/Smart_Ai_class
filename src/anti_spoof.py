@@ -120,3 +120,47 @@ _detector = LivenessDetector()
 
 def evaluate_liveness(face_crop):
     return _detector.check_liveness(face_crop)
+
+
+def evaluate_face_quality(face_crop, min_size=70, blur_thresh=150.0, min_b=40.0, max_b=225.0, min_contrast=25.0):
+    """
+    Step 4 Quality Gate: Validates bounding-box dimensions, blur, brightness, and contrast.
+    Returns:
+        passed (bool): Whether the face crop qualifies for biometric recognition.
+        reason (str): Human-readable failure reason if rejected.
+        metrics (dict): Numeric quality indicators.
+    """
+    if face_crop is None or face_crop.size == 0:
+        return False, "EMPTY_CROP", {}
+
+    h, w = face_crop.shape[:2]
+    if w < min_size or h < min_size:
+        return False, f"FACE_TOO_SMALL ({w}x{h} < {min_size}px)", {"width": w, "height": h}
+
+    gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
+    blur_score = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    mean_brightness = float(np.mean(gray))
+    std_contrast = float(np.std(gray))
+
+    metrics = {
+        "width": w,
+        "height": h,
+        "sharpness": round(blur_score, 1),
+        "brightness": round(mean_brightness, 1),
+        "contrast": round(std_contrast, 1)
+    }
+
+    if blur_score < blur_thresh:
+        return False, f"BLURRY_FACE (Sharpness {blur_score:.1f} < {blur_thresh})", metrics
+
+    if mean_brightness < min_b:
+        return False, f"LOW_LIGHT (Brightness {mean_brightness:.1f} < {min_b})", metrics
+
+    if mean_brightness > max_b:
+        return False, f"OVEREXPOSED (Brightness {mean_brightness:.1f} > {max_b})", metrics
+
+    if std_contrast < min_contrast:
+        return False, f"LOW_CONTRAST (Contrast {std_contrast:.1f} < {min_contrast})", metrics
+
+    return True, "QUALITY_PASSED", metrics
+

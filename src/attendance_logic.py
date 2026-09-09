@@ -8,9 +8,14 @@ from pathlib import Path
 from datetime import datetime
 from src.detector import FaceDetector
 from src.recognizer import FaceRecognizer
-from src.anti_spoof import evaluate_liveness
+from src.anti_spoof import evaluate_liveness, evaluate_face_quality
 from src.database import get_student_info, save_attendance_entry, get_students_by_class, generate_file_checksum, log_security_event
-from utils.config import ATTENDANCE_DIR, CLASS_PHOTOS_DIR, UNKNOWN_FACES_DIR, CAMERA_ID, BASE_DIR
+from utils.config import (
+    ATTENDANCE_DIR, CLASS_PHOTOS_DIR, UNKNOWN_FACES_DIR, CAMERA_ID, BASE_DIR,
+    MIN_FACE_SIZE, BLUR_THRESHOLD, MIN_BRIGHTNESS, MAX_BRIGHTNESS, MIN_CONTRAST,
+    TOTAL_CAPTURE_SHOTS, REQUIRED_CONSISTENT_VOTES, SHOT_COUNTDOWN_SECONDS,
+    ARCFACE_SIMILARITY_THRESHOLD, DEBUG_MODE
+)
 
 DB_PATH = BASE_DIR / "data" / "smartclass.db"
 
@@ -73,15 +78,15 @@ def start_attendance(subject_info=None):
     # Force High Definition
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-    NUM_SHOTS = 7
-    REQUIRED_MATCHES = 2
-    SHOT_INTERVAL = 1.2
+    NUM_SHOTS = TOTAL_CAPTURE_SHOTS
+    REQUIRED_MATCHES = REQUIRED_CONSISTENT_VOTES
+    SHOT_INTERVAL = SHOT_COUNTDOWN_SECONDS
     captured_frames = []
 
     # Extract target section student roll numbers for context-aware priority matching
     enrolled_roll_numbers = [str(s[0]) for s in enrolled_students] if enrolled_students else []
 
-    print("[INFO] Initiating 7-Shot Multi-Angle Batch Capture with Live Overlays...")
+    print(f"[INFO] Initiating {NUM_SHOTS}-Shot Multi-Angle Batch Capture (Consensus: {REQUIRED_MATCHES}/{NUM_SHOTS})...")
 
     # PHASE 1: BATCH CAPTURE WITH REAL-TIME MULTI-FACE DETECTION
     for i in range(NUM_SHOTS):
@@ -139,59 +144,92 @@ def start_attendance(subject_info=None):
     # PHASE 2: AI PROCESSING (SECTION-AWARE MULTI-STUDENT RECOGNITION)
     print(f"\n[INFO] Cross-referencing captures with Section Roster ({len(enrolled_roll_numbers)} enrolled candidates)...")
     student_detections = {}
+    student_similarities = {}
     spoof_incidents = 0
 
     for f_idx, frame in enumerate(captured_frames):
         # Update live visual progress window
         processing_screen = np.zeros((400, 800, 3), dtype="uint8")
         progress_pct = int(((f_idx + 1) / NUM_SHOTS) * 100)
-        cv2.putText(processing_screen, "AI Verification in Progress...", (50, 90), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-        cv2.putText(processing_screen, f"Processing Shot {f_idx + 1} of {NUM_SHOTS} ({progress_pct}%)", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+        cv2.putText(processing_screen, "AI Biometric Verification & Voting...", (50, 90), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+        cv2.putText(processing_screen, f"Evaluating Shot {f_idx + 1} of {NUM_SHOTS} ({progress_pct}%)", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
         # Progress bar
         cv2.rectangle(processing_screen, (50, 180), (750, 210), (50, 50, 50), -1)
         bar_w = int(700 * ((f_idx + 1) / NUM_SHOTS))
         cv2.rectangle(processing_screen, (50, 180), (50 + bar_w, 210), (0, 255, 0), -1)
-        cv2.putText(processing_screen, f"Matching against {class_title} ({enrolled_count} students)...",
+        cv2.putText(processing_screen, f"Auditing against {class_title} ({enrolled_count} students)...",
                     (50, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (200, 200, 200), 1)
         cv2.imshow("SmartClass Vision - Section Attendance Scan", processing_screen)
         cv2.waitKey(1)
 
-        processed_frame, cropped_faces = detector.detect_faces(frame)
-        print(f"[SHOT {f_idx + 1}] Detected {len(cropped_faces)} faces in frame")
+        processed_frame, detected_faces = detector.detect_faces(frame)
+        print(f"\n[SHOT {f_idx + 1}] Detected {len(detected_faces)} raw face bounding boxes in frame")
 
         valid_live_crops = []
-        for face_data in cropped_faces:
-            face_crop = face_data["image"]
+        for face_idx, face_data in enumerate(detected_faces):
+            raw_crop = face_data.get("raw_crop", face_data["image"])
+            aligned_face = face_data["image"]
+            coords = face_data["coords"]
+            det_score = face_data.get("score", 0.0)
 
-            # BIOMETRIC LIVENESS & ANTI-SPOOFING ASSESSMENT
-            is_live, l_score, l_reason = evaluate_liveness(face_crop)
+            # STEP 4: Comprehensive Face-Quality Gate (Size, Blur, Brightness, Contrast)
+            q_pass, q_reason, q_metrics = evaluate_face_quality(
+                raw_crop, min_size=MIN_FACE_SIZE, blur_thresh=BLUR_THRESHOLD,
+                min_b=MIN_BRIGHTNESS, max_b=MAX_BRIGHTNESS, min_contrast=MIN_CONTRAST
+            )
+            if not q_pass:
+                if DEBUG_MODE:
+                    print(f"  [QUALITY REJECT] Face #{face_idx+1}: {q_reason} | Coords: {coords}")
+                continue
+
+            # Biometric Liveness & Anti-Spoofing Assessment
+            is_live, l_score, l_reason = evaluate_liveness(raw_crop)
             if not is_live:
                 spoof_incidents += 1
                 spoof_ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                 UNKNOWN_FACES_DIR.mkdir(parents=True, exist_ok=True)
                 spoof_path = UNKNOWN_FACES_DIR / f"spoof_{sub_code}_{spoof_ts}.jpg"
-                cv2.imwrite(str(spoof_path), face_crop)
-                print(f"[SECURITY ALERT - SPOOF DETECTED] Score: {l_score}%, Reason: {l_reason}")
+                cv2.imwrite(str(spoof_path), raw_crop)
+                print(f"  [SECURITY ALERT - SPOOF DETECTED] Score: {l_score}%, Reason: {l_reason}")
                 log_security_event("SPOOF_ATTEMPT", "CRITICAL", teacher_name,
                                    f"Biometric spoof rejected in {sub_code} ({l_reason}, Score: {l_score}%). Snapshot: {spoof_path.name}")
                 continue
 
-            # Quality check: Discard motion-blurred crops to prevent false identification
-            face_gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
-            sharpness = cv2.Laplacian(face_gray, cv2.CV_64F).var()
-            if sharpness < 180.0:
-                print(f"[QUALITY ALERT] Discarding blurry face crop (Sharpness: {sharpness:.1f} < 180.0)")
-                continue
+            valid_live_crops.append({
+                "aligned": aligned_face,
+                "raw": raw_crop,
+                "coords": coords,
+                "det_score": det_score,
+                "metrics": q_metrics
+            })
 
-            valid_live_crops.append(face_crop)
-
-        # High-Speed Vectorized Batch ArcFace Inference per shot with section-awareness
+        # STEP 5 & 6: Vectorized Canonical ArcFace Inference with Global Cosine Matching & UNKNOWN Gating
         if valid_live_crops:
-            batch_matches = recognizer.recognize_batch(valid_live_crops, candidate_rolls=enrolled_roll_numbers)
-            for roll_number, confidence in batch_matches:
+            aligned_batch = [item["aligned"] for item in valid_live_crops]
+            batch_matches = recognizer.recognize_batch(aligned_batch)
+            for item_idx, match_res in enumerate(batch_matches):
+                roll_number = match_res[0]
+                confidence = match_res[1]
+                diag = match_res[2] if len(match_res) > 2 else {}
+
+                item_info = valid_live_crops[item_idx]
+                w, h = item_info["metrics"]["width"], item_info["metrics"]["height"]
+                det_score = item_info["det_score"]
+
                 if roll_number != "Unknown":
                     student_detections[roll_number] = student_detections.get(roll_number, 0) + 1
-                    print(f"   -> Identified {roll_number} (Conf={confidence}%)")
+                    if roll_number not in student_similarities:
+                        student_similarities[roll_number] = []
+                    student_similarities[roll_number].append(diag.get("top1_sim", confidence / 100.0))
+                    
+                    if DEBUG_MODE:
+                        print(f"  [DEBUG STEP 10 - VERIFIED] Roll: {roll_number} | Sim: {diag.get('top1_sim', 0):.3f} (Conf: {confidence}%) | "
+                              f"Det: {det_score:.2f} | BBox: {w}x{h} | Margin: {diag.get('margin', 0):.3f}")
+                else:
+                    if DEBUG_MODE:
+                        print(f"  [DEBUG STEP 10 - UNKNOWN] Reason: {diag.get('reason', 'UNKNOWN')} | "
+                              f"Top Candidate: {diag.get('top1_roll', 'None')} (Sim: {diag.get('top1_sim', 0):.3f} < {ARCFACE_SIMILARITY_THRESHOLD}) | "
+                              f"Det: {det_score:.2f} | BBox: {w}x{h}")
 
     cv2.destroyAllWindows()
 
