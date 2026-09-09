@@ -12,9 +12,9 @@ EMBEDDINGS_FILE = BASE_DIR / "data" / "embeddings.pkl"
 
 class FaceRecognizer:
     def __init__(self):
-        self.model_name = "Facenet512"
+        self.model_name = "ArcFace"
         self.known_embeddings = {}
-        self.threshold = 0.25
+        self.threshold = 0.35
 
         if EMBEDDINGS_FILE.exists():
             with open(EMBEDDINGS_FILE, "rb") as f:
@@ -67,8 +67,8 @@ class FaceRecognizer:
                 filtered_pool = {k: v for k, v in self.known_embeddings.items() if str(k) in [str(r) for r in candidate_rolls]}
                 if filtered_pool:
                     search_pool = filtered_pool
-                    # Slightly more lenient threshold when matching within known section roster
-                    effective_threshold = 0.32
+                    # Generous angular tolerance for enrolled section roster
+                    effective_threshold = 0.42
 
             for roll_number, saved_embeddings in search_pool.items():
                 for saved_emb in saved_embeddings:
