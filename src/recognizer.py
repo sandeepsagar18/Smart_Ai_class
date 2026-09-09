@@ -46,7 +46,7 @@ class FaceRecognizer:
         self.known_embeddings = embeddings_dict
         print(f"[SUCCESS] Training complete! Loaded {len(self.known_embeddings)} students into HD memory.")
 
-    def recognize(self, face_crop):
+    def recognize(self, face_crop, candidate_rolls=None):
         if not self.known_embeddings:
             return "Unknown", 0.0
         try:
@@ -60,7 +60,17 @@ class FaceRecognizer:
             best_match = "Unknown"
             best_distance = float("inf")
 
-            for roll_number, saved_embeddings in self.known_embeddings.items():
+            # If candidates provided (e.g. section students), search candidate pool first
+            search_pool = self.known_embeddings
+            effective_threshold = self.threshold
+            if candidate_rolls:
+                filtered_pool = {k: v for k, v in self.known_embeddings.items() if str(k) in [str(r) for r in candidate_rolls]}
+                if filtered_pool:
+                    search_pool = filtered_pool
+                    # Slightly more lenient threshold when matching within known section roster
+                    effective_threshold = 0.32
+
+            for roll_number, saved_embeddings in search_pool.items():
                 for saved_emb in saved_embeddings:
                     saved_emb = np.array(saved_emb)
                     distance = np.dot(live_embedding, saved_emb) / (
@@ -71,8 +81,8 @@ class FaceRecognizer:
                         best_distance = cosine_distance
                         best_match = roll_number
 
-            if best_distance < self.threshold:
-                confidence = round((1 - (best_distance / self.threshold)) * 100, 2)
+            if best_distance < effective_threshold:
+                confidence = round((1 - (best_distance / effective_threshold)) * 100, 2)
                 return best_match, confidence
             else:
                 return "Unknown", 0.0
