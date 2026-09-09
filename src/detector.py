@@ -1,9 +1,7 @@
 import cv2
 import numpy as np
 from pathlib import Path
-from utils.config import BASE_DIR, CONFIDENCE_THRESHOLD
-
-YUNET_PATH = BASE_DIR / "models" / "face_detection_yunet_2023mar.onnx"
+from utils.config import BASE_DIR, CONFIDENCE_THRESHOLD, YUNET_MODEL_PATH
 
 
 class FaceDetector:
@@ -15,10 +13,10 @@ class FaceDetector:
     """
     def __init__(self):
         self.yunet = None
-        if YUNET_PATH.exists():
+        if YUNET_MODEL_PATH.exists():
             try:
                 self.yunet = cv2.FaceDetectorYN.create(
-                    model=str(YUNET_PATH),
+                    model=str(YUNET_MODEL_PATH),
                     config="",
                     input_size=(640, 480),
                     score_threshold=max(0.55, CONFIDENCE_THRESHOLD),

@@ -2390,8 +2390,8 @@ class SmartClassApp(ctk.CTk):
                 f"• Total Active Subjects: {stats['subjects']}\n"
                 f"• Total Attendance Records: {stats['attendance_records']}\n\n"
                 f"• AI Facial Embeddings: {stats['embeddings_count']} Loaded\n"
-                f"• YuNet Human Face Model: {'✅ Present' if stats['yolo_weights'] else '❌ Missing'}\n"
-                f"• ArcFace Deep Learning Model: {'✅ Present' if stats['facenet_weights'] else '❌ Missing'}"
+                f"• YuNet Human Face Model: {'✅ Present' if stats.get('yunet_weights', stats.get('yolo_weights')) else '❌ Missing'}\n"
+                f"• ArcFace Deep Learning Model: {'✅ Present' if stats.get('arcface_weights', stats.get('facenet_weights')) else '❌ Missing'}"
             )
             lbl_diag_text.configure(text=msg)
 

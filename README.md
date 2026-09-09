@@ -76,8 +76,8 @@ SmartClassVision/
 │   ├── anti_spoof.py           # Texture, reflection, and liveness analysis
 │   ├── attendance_logic.py     # Real-time multi-shot attendance capture engine
 │   ├── database.py             # SQLite schema, HMAC signing, RBAC, and queries
-│   ├── detector.py             # YOLOv8 face detector wrapper
-│   ├── recognizer.py           # FaceNet512 embedding extraction and training
+│   ├── detector.py             # OpenCV YuNet dedicated DNN human face detector
+│   ├── recognizer.py           # InsightFace ArcFace 512-D embedding extraction & matching
 │   └── registration.py         # Multi-shot student dataset registration
 ├── utils/
 │   └── config.py               # Path configurations and global constants

@@ -885,8 +885,8 @@ def get_system_diagnostics():
         "attendance_records": attendance_count,
         "db_size_kb": round(db_size_kb, 2),
         "embeddings_count": emb_count,
-        "yolo_weights": yunet_exists,
-        "facenet_weights": arcface_exists
+        "yunet_weights": yunet_exists,
+        "arcface_weights": arcface_exists
     }
 
 

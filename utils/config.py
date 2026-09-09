@@ -10,11 +10,7 @@ ATTENDANCE_DIR = BASE_DIR / "data" / "attendance_records"
 CLASS_PHOTOS_DIR = BASE_DIR / "data" / "class_photos"
 
 # Model Directories
-YOLO_WEIGHTS_CANDIDATE = BASE_DIR / "models" / "yolo_weights" / "yolov8n-face.pt"
-if not YOLO_WEIGHTS_CANDIDATE.exists():
-    if (BASE_DIR / "yolov8n.pt").exists():
-        YOLO_WEIGHTS_CANDIDATE = BASE_DIR / "yolov8n.pt"
-YOLO_WEIGHTS = YOLO_WEIGHTS_CANDIDATE
+YUNET_MODEL_PATH = BASE_DIR / "models" / "face_detection_yunet_2023mar.onnx"
 DEEPFACE_DIR = BASE_DIR / "models"
 
 # Camera Settings
