@@ -75,24 +75,25 @@ def start_attendance(subject_info=None):
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
     time.sleep(2)
 
-    NUM_SHOTS = 5
+    NUM_SHOTS = 3
     REQUIRED_MATCHES = 2
+    SHOT_INTERVAL = 1.2
     captured_frames = []
 
     # Extract target section student roll numbers for context-aware priority matching
     enrolled_roll_numbers = [str(s[0]) for s in enrolled_students] if enrolled_students else []
 
-    print("[INFO] Initiating Multi-Shot Batch Capture with Live Multi-Face Overlays...")
+    print("[INFO] Initiating High-Speed Multi-Shot Batch Capture with Live Overlays...")
 
     # PHASE 1: BATCH CAPTURE WITH REAL-TIME MULTI-FACE DETECTION
     for i in range(NUM_SHOTS):
         start_wait = time.time()
-        while time.time() - start_wait < 2.5:
+        while time.time() - start_wait < SHOT_INTERVAL:
             ret, frame = cap.read()
             if not ret: break
 
             display_frame = frame.copy()
-            time_left = 2.5 - (time.time() - start_wait)
+            time_left = max(0.0, SHOT_INTERVAL - (time.time() - start_wait))
 
             # Detect multiple faces in live preview so teacher sees all students being captured
             _, live_faces = detector.detect_faces(display_frame)
@@ -109,14 +110,14 @@ def start_attendance(subject_info=None):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
             cv2.putText(display_frame, f"Section Enrolled: {enrolled_count} Students | Live Faces: {active_count}", (25, 95),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 200), 1)
-            cv2.putText(display_frame, f"Scan Shot {i + 1}/{NUM_SHOTS} - Scanning All Faces: {int(time_left) + 1}s", (25, 130),
+            cv2.putText(display_frame, f"Scan Shot {i + 1}/{NUM_SHOTS} - Next Snap: {time_left:.1f}s", (25, 130),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 2)
 
             cv2.imshow("SmartClass Vision - Section Attendance Scan", display_frame)
             cv2.waitKey(1)
 
         # Flush camera buffer to guarantee a fresh snapshot
-        for _ in range(3):
+        for _ in range(2):
             cap.grab()
         ret, frame = cap.read()
         if ret:
@@ -125,33 +126,38 @@ def start_attendance(subject_info=None):
             cv2.imwrite(str(CLASS_PHOTOS_DIR / photo_name), frame)
             print(f"[CAPTURE] Secured High-Res Image: {photo_name}")
 
-            # Elegant capture visual confirmation (no harsh all-white flash screen)
+            # Elegant capture visual confirmation
             feedback_frame = frame.copy()
-            cv2.rectangle(feedback_frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 255, 0), 10)
+            cv2.rectangle(feedback_frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 255, 0), 8)
             cv2.rectangle(feedback_frame, (frame.shape[1] // 2 - 280, 20), (frame.shape[1] // 2 + 280, 85), (20, 20, 20), -1)
             cv2.rectangle(feedback_frame, (frame.shape[1] // 2 - 280, 20), (frame.shape[1] // 2 + 280, 85), (0, 255, 0), 2)
             cv2.putText(feedback_frame, f"SHOT {i + 1}/{NUM_SHOTS} SECURED", (frame.shape[1] // 2 - 210, 62),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)
             cv2.imshow("SmartClass Vision - Section Attendance Scan", feedback_frame)
-            cv2.waitKey(100)
+            cv2.waitKey(80)
 
     cap.release()
 
     # PHASE 2: AI PROCESSING (SECTION-AWARE MULTI-STUDENT RECOGNITION)
-    processing_screen = np.zeros((400, 800, 3), dtype="uint8")
-    cv2.putText(processing_screen, "Captures Complete.", (50, 110), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 255, 0), 2)
-    cv2.putText(processing_screen, f"Cross-checking all faces against {class_title}...",
-                (50, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 255), 2)
-    cv2.putText(processing_screen, f"Prioritizing {enrolled_count} enrolled students in section...",
-                (50, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
-    cv2.imshow("SmartClass Vision - Section Attendance Scan", processing_screen)
-    cv2.waitKey(100)
-
     print(f"\n[INFO] Cross-referencing captures with Section Roster ({len(enrolled_roll_numbers)} enrolled candidates)...")
     student_detections = {}
     spoof_incidents = 0
 
     for f_idx, frame in enumerate(captured_frames):
+        # Update live visual progress window
+        processing_screen = np.zeros((400, 800, 3), dtype="uint8")
+        progress_pct = int(((f_idx + 1) / NUM_SHOTS) * 100)
+        cv2.putText(processing_screen, "AI Verification in Progress...", (50, 90), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+        cv2.putText(processing_screen, f"Processing Shot {f_idx + 1} of {NUM_SHOTS} ({progress_pct}%)", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+        # Progress bar
+        cv2.rectangle(processing_screen, (50, 180), (750, 210), (50, 50, 50), -1)
+        bar_w = int(700 * ((f_idx + 1) / NUM_SHOTS))
+        cv2.rectangle(processing_screen, (50, 180), (50 + bar_w, 210), (0, 255, 0), -1)
+        cv2.putText(processing_screen, f"Matching against {class_title} ({enrolled_count} students)...",
+                    (50, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (200, 200, 200), 1)
+        cv2.imshow("SmartClass Vision - Section Attendance Scan", processing_screen)
+        cv2.waitKey(1)
+
         processed_frame, cropped_faces = detector.detect_faces(frame)
         print(f"[SHOT {f_idx + 1}] Detected {len(cropped_faces)} faces in frame")
 

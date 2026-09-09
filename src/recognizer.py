@@ -22,6 +22,12 @@ class FaceRecognizer:
                 self.known_embeddings = pickle.load(f)
             self._compute_centroids()
 
+        # Warm up the ArcFace neural network weights in memory to eliminate cold-start delay
+        try:
+            DeepFace.build_model(self.model_name)
+        except Exception as e:
+            pass
+
     def _compute_centroids(self):
         self.centroids = {}
         for roll, embs in self.known_embeddings.items():
