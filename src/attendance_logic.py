@@ -236,8 +236,10 @@ def start_attendance(subject_info=None):
                 rejected_wrong_section.append({
                     "roll": s_roll, "name": s_name, "enrolled": f"{s_degree} {s_year} {s_branch} Sec {s_section}"
                 })
-        else:
-            print(f"[REJECTED - LOW MATCHES] {s_name} ({s_roll}) only detected in {count}/{NUM_SHOTS} shots -> Glitch discarded.")
+        elif count < REQUIRED_MATCHES:
+            # Only report low matches if the student is actually enrolled in this class/section
+            if is_correct_section:
+                print(f"[REJECTED - LOW MATCHES] {s_name} ({s_roll}) only detected in {count}/{NUM_SHOTS} shots -> Glitch discarded.")
 
     filename = None
     hmac_sig = None
