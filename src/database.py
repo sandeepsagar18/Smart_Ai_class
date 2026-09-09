@@ -725,8 +725,14 @@ def get_system_diagnostics():
         except:
             pass
 
-    yolo_exists = (BASE_DIR / "models" / "yolo_weights" / "yolov8n-face.pt").exists()
-    facenet_exists = (BASE_DIR / "models" / ".deepface" / "weights" / "facenet_weights.h5").exists()
+    yolo_exists = (BASE_DIR / "models" / "yolo_weights" / "yolov8n-face.pt").exists() or (BASE_DIR / "yolov8n.pt").exists()
+    facenet_candidates = [
+        BASE_DIR / "models" / ".deepface" / "weights" / "facenet512_weights.h5",
+        BASE_DIR / "models" / ".deepface" / "weights" / "facenet_weights.h5",
+        Path.home() / ".deepface" / "weights" / "facenet512_weights.h5",
+        Path.home() / ".deepface" / "weights" / "facenet_weights.h5"
+    ]
+    facenet_exists = any(p.exists() for p in facenet_candidates)
 
     return {
         "students": student_count,
