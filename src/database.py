@@ -701,6 +701,88 @@ def delete_attendance_log(log_id):
     return True
 
 
+def get_distinct_attendance_dates():
+    """Returns list of distinct dates present in attendance_records, newest first."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT date FROM attendance_records ORDER BY date DESC")
+    dates = [r[0] for r in cursor.fetchall() if r[0]]
+    conn.close()
+    return dates
+
+
+
+def delete_attendance_by_student(roll_number, requesting_user=None, password=None, date_filter=None, subject_id_filter=None):
+    """
+    Deletes attendance records for a particular student.
+    Optionally filters by specific date or subject.
+    """
+    init_db()
+    if requesting_user and password:
+        if not verify_teacher_password(requesting_user["id"], password):
+            return False, "Security check failed: Incorrect Administrator password!", 0
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    query = "DELETE FROM attendance_records WHERE UPPER(roll_number) = UPPER(?)"
+    params = [str(roll_number).strip()]
+
+    if date_filter and date_filter != "ALL":
+        query += " AND date = ?"
+        params.append(date_filter)
+
+    if subject_id_filter and subject_id_filter != "ALL":
+        query += " AND subject_id = ?"
+        params.append(int(subject_id_filter))
+
+    cursor.execute(query, tuple(params))
+    deleted_count = cursor.rowcount
+    conn.commit()
+    conn.close()
+
+    admin_id = requesting_user.get("employee_id", "ADMIN") if requesting_user else "SYSTEM"
+    log_security_event("ATTENDANCE_DELETED", "WARNING", admin_id,
+                       f"Deleted {deleted_count} attendance records for student '{roll_number}' (Date: {date_filter or 'ALL'})")
+    return True, f"Successfully deleted {deleted_count} attendance records for student {roll_number}.", deleted_count
+
+
+def delete_attendance_by_batch(branch, section, date_filter=None, subject_id_filter=None, requesting_user=None, password=None):
+    """
+    Deletes attendance records for a particular batch (branch and section).
+    Optionally filters by date or subject.
+    """
+    init_db()
+    if requesting_user and password:
+        if not verify_teacher_password(requesting_user["id"], password):
+            return False, "Security check failed: Incorrect Administrator password!", 0
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    query = "DELETE FROM attendance_records WHERE UPPER(branch) = UPPER(?) AND UPPER(section) = UPPER(?)"
+    params = [str(branch).strip(), str(section).strip()]
+
+    if date_filter and date_filter != "ALL":
+        query += " AND date = ?"
+        params.append(date_filter)
+
+    if subject_id_filter and subject_id_filter != "ALL":
+        query += " AND subject_id = ?"
+        params.append(int(subject_id_filter))
+
+    cursor.execute(query, tuple(params))
+    deleted_count = cursor.rowcount
+    conn.commit()
+    conn.close()
+
+    admin_id = requesting_user.get("employee_id", "ADMIN") if requesting_user else "SYSTEM"
+    log_security_event("ATTENDANCE_BATCH_DELETED", "WARNING", admin_id,
+                       f"Deleted {deleted_count} attendance records for Batch '{branch}-{section}' (Date: {date_filter or 'ALL'})")
+    return True, f"Successfully deleted {deleted_count} attendance records for Batch {branch}-{section}.", deleted_count
+
+
 # SYSTEM DIAGNOSTICS
 def get_system_diagnostics():
     init_db()

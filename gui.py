@@ -20,7 +20,8 @@ from src.database import (
     get_attendance_for_subject_date, delete_student_secure,
     get_all_students_master, update_student_details, admin_reset_teacher_password,
     update_teacher_role, reassign_subject_teacher, get_system_diagnostics,
-    get_attendance_audit_logs, delete_attendance_log,
+    get_attendance_audit_logs, delete_attendance_log, get_distinct_attendance_dates,
+    delete_attendance_by_student, delete_attendance_by_batch,
     unlock_teacher_account, verify_admin_master_key, get_admin_master_key,
     update_admin_master_key, generate_file_checksum, verify_file_integrity,
     get_security_audit_logs, create_database_backup, get_backup_list, log_security_event
@@ -1652,6 +1653,7 @@ class SmartClassApp(ctk.CTk):
         tab_std = adm_tabs.add("Student Directory & Transfers")
         tab_cur = adm_tabs.add("Curriculum & Allotments")
         tab_aud = adm_tabs.add("Attendance Audits")
+        tab_del_att = adm_tabs.add("Delete Attendance")
         tab_sec = adm_tabs.add("Security & Spoof Audits")
         tab_int = adm_tabs.add("Integrity & Backups")
         tab_sys = adm_tabs.add("System Diagnostics")
@@ -2054,6 +2056,158 @@ class SmartClassApp(ctk.CTk):
             self.refresh_dashboard_metrics()
 
         refresh_admin_audits()
+
+        # -------------------------------------------------------------
+        # ADMIN TAB: DELETE ATTENDANCE (PARTICULAR BATCH & STUDENT)
+        # -------------------------------------------------------------
+        tab_del_att.grid_columnconfigure((0, 1), weight=1)
+        tab_del_att.grid_rowconfigure(0, weight=1)
+
+        # Helper to fetch current date options
+        def get_date_choices():
+            d_list = get_distinct_attendance_dates()
+            return ["ALL DATES"] + d_list if d_list else ["ALL DATES"]
+
+        # CARD 1: DELETE BY PARTICULAR STUDENT
+        del_std_card = ctk.CTkFrame(tab_del_att, fg_color="#1a1c23", corner_radius=10)
+        del_std_card.grid(row=0, column=0, padx=12, pady=12, sticky="nsew")
+
+        ctk.CTkLabel(del_std_card, text="Delete Attendance: Particular Student",
+                     font=ctk.CTkFont(size=16, weight="bold"), text_color="#ff7b72").pack(pady=(15, 6))
+        ctk.CTkLabel(del_std_card, text="Purge attendance entries for an individual student across all or specific dates.",
+                     font=ctk.CTkFont(size=11), text_color="gray", wraplength=440, justify="center").pack(padx=20, pady=(0, 15))
+
+        std_form = ctk.CTkFrame(del_std_card, fg_color="transparent")
+        std_form.pack(fill="x", padx=30, pady=5)
+
+        ctk.CTkLabel(std_form, text="Student Roll Number:", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", pady=(4, 2))
+        ent_del_roll = ctk.CTkEntry(std_form, placeholder_text="e.g. 2023021058", height=35)
+        ent_del_roll.pack(fill="x", pady=(0, 12))
+
+        ctk.CTkLabel(std_form, text="Date Filter:", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", pady=(4, 2))
+        std_date_var = ctk.StringVar(value="ALL DATES")
+        std_date_menu = ctk.CTkOptionMenu(std_form, variable=std_date_var, values=get_date_choices(), height=35)
+        std_date_menu.pack(fill="x", pady=(0, 15))
+
+        def refresh_date_menus():
+            choices = get_date_choices()
+            std_date_menu.configure(values=choices)
+            batch_date_menu.configure(values=choices)
+
+        def do_delete_student_attendance():
+            roll = ent_del_roll.get().strip()
+            if not roll:
+                self.show_warning("Input Required", "Please enter a student Roll Number.", parent=admin_win)
+                return
+
+            chosen_date = std_date_var.get()
+            date_filter = None if chosen_date == "ALL DATES" else chosen_date
+
+            confirm_msg = f"Are you sure you want to delete attendance for student '{roll}' on {chosen_date}?"
+            if not self.show_confirm("Confirm Attendance Deletion", confirm_msg, parent=admin_win):
+                return
+
+            pwd = self.prompt_input("Administrator Verification", "Enter your Admin password to authorize deletion:", parent=admin_win, is_password=True)
+            if not pwd:
+                return
+
+            ok, msg, count = delete_attendance_by_student(
+                roll_number=roll,
+                requesting_user=self.current_user,
+                password=pwd,
+                date_filter=date_filter
+            )
+
+            if ok:
+                if count > 0:
+                    self.show_info("Success", msg, parent=admin_win)
+                else:
+                    self.show_warning("No Records Found", f"No attendance records found matching student '{roll}' ({chosen_date}).", parent=admin_win)
+                ent_del_roll.delete(0, "end")
+                refresh_date_menus()
+                refresh_admin_audits()
+                self.refresh_dashboard_metrics()
+            else:
+                self.show_error("Operation Failed", msg, parent=admin_win)
+
+        ctk.CTkButton(del_std_card, text="Delete Student Attendance",
+                      fg_color="#a82020", hover_color="#c92a2a", height=38,
+                      font=ctk.CTkFont(weight="bold"),
+                      command=do_delete_student_attendance).pack(padx=30, pady=(15, 10), fill="x")
+
+        # CARD 2: DELETE BY PARTICULAR BATCH
+        del_batch_card = ctk.CTkFrame(tab_del_att, fg_color="#1a1c23", corner_radius=10)
+        del_batch_card.grid(row=0, column=1, padx=12, pady=12, sticky="nsew")
+
+        ctk.CTkLabel(del_batch_card, text="Delete Attendance: Particular Batch",
+                     font=ctk.CTkFont(size=16, weight="bold"), text_color="#ff7b72").pack(pady=(15, 6))
+        ctk.CTkLabel(del_batch_card, text="Purge attendance entries for an entire class batch (Branch + Section) safely.",
+                     font=ctk.CTkFont(size=11), text_color="gray", wraplength=440, justify="center").pack(padx=20, pady=(0, 15))
+
+        batch_form = ctk.CTkFrame(del_batch_card, fg_color="transparent")
+        batch_form.pack(fill="x", padx=30, pady=5)
+
+        branch_row = ctk.CTkFrame(batch_form, fg_color="transparent")
+        branch_row.pack(fill="x", pady=(0, 10))
+        branch_row.grid_columnconfigure((0, 1), weight=1)
+
+        b_col = ctk.CTkFrame(branch_row, fg_color="transparent")
+        b_col.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        ctk.CTkLabel(b_col, text="Branch:", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", pady=(2, 2))
+        batch_branch_var = ctk.StringVar(value="CSE")
+        ctk.CTkOptionMenu(b_col, variable=batch_branch_var,
+                          values=["CSE", "IT", "ECE", "MECHANICAL", "CIVIL", "ELECTRICAL", "CHEMICAL"],
+                          height=35).pack(fill="x")
+
+        s_col = ctk.CTkFrame(branch_row, fg_color="transparent")
+        s_col.grid(row=0, column=1, sticky="ew", padx=(8, 0))
+        ctk.CTkLabel(s_col, text="Section:", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", pady=(2, 2))
+        batch_sec_var = ctk.StringVar(value="A")
+        ctk.CTkOptionMenu(s_col, variable=batch_sec_var, values=["A", "B", "C", "D"],
+                          height=35).pack(fill="x")
+
+        ctk.CTkLabel(batch_form, text="Date Filter:", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", pady=(4, 2))
+        batch_date_var = ctk.StringVar(value="ALL DATES")
+        batch_date_menu = ctk.CTkOptionMenu(batch_form, variable=batch_date_var, values=get_date_choices(), height=35)
+        batch_date_menu.pack(fill="x", pady=(0, 15))
+
+        def do_delete_batch_attendance():
+            branch = batch_branch_var.get().strip()
+            section = batch_sec_var.get().strip()
+            chosen_date = batch_date_var.get()
+            date_filter = None if chosen_date == "ALL DATES" else chosen_date
+
+            confirm_msg = f"DANGER: Are you sure you want to delete ALL attendance records for Batch '{branch}-{section}' on {chosen_date}?"
+            if not self.show_confirm("Confirm Batch Deletion", confirm_msg, parent=admin_win):
+                return
+
+            pwd = self.prompt_input("Administrator Verification", "Enter your Admin password to authorize batch deletion:", parent=admin_win, is_password=True)
+            if not pwd:
+                return
+
+            ok, msg, count = delete_attendance_by_batch(
+                branch=branch,
+                section=section,
+                date_filter=date_filter,
+                requesting_user=self.current_user,
+                password=pwd
+            )
+
+            if ok:
+                if count > 0:
+                    self.show_info("Success", msg, parent=admin_win)
+                else:
+                    self.show_warning("No Records Found", f"No attendance records found for Batch '{branch}-{section}' ({chosen_date}).", parent=admin_win)
+                refresh_date_menus()
+                refresh_admin_audits()
+                self.refresh_dashboard_metrics()
+            else:
+                self.show_error("Operation Failed", msg, parent=admin_win)
+
+        ctk.CTkButton(del_batch_card, text="Delete Batch Attendance",
+                      fg_color="#a82020", hover_color="#c92a2a", height=38,
+                      font=ctk.CTkFont(weight="bold"),
+                      command=do_delete_batch_attendance).pack(padx=30, pady=(15, 10), fill="x")
 
         # -------------------------------------------------------------
         # ADMIN TAB 5: ENTERPRISE SECURITY & SPOOF AUDITS
