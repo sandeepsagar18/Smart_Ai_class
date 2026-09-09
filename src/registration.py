@@ -5,6 +5,7 @@ import numpy as np
 from pathlib import Path
 from src.database import add_student, delete_student, student_exists, get_student_info
 from src.detector import FaceDetector
+from src.ui_helpers import draw_clean_text
 from utils.config import KNOWN_FACES_DIR, CAMERA_ID
 
 
@@ -180,8 +181,9 @@ def register_student(roll_number, name, gender, degree, year, branch, section):
             # Quality meter overlay
             badge_text = f"Sharpness: {int(blur_val)} | Light: {int(avg_brightness)}"
             cv2.rectangle(processed_frame, (fx1, fy2 + 5), (fx1 + 240, fy2 + 30), (20, 20, 20), -1)
-            cv2.putText(processed_frame, badge_text, (fx1 + 6, fy2 + 22),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255) if quality_passed else (0, 165, 255), 1)
+            badge_color = (0, 255, 255) if quality_passed else (0, 165, 255)
+            processed_frame = draw_clean_text(processed_frame, badge_text, (fx1 + 8, fy2 + 8),
+                                              font_size=13, color=badge_color, bold=True)
 
             msg = quality_msg
 
@@ -192,23 +194,24 @@ def register_student(roll_number, name, gender, degree, year, branch, section):
             msg = "Looking for student face... Please face the camera directly"
             color = (0, 165, 255)
 
-        # Header Info Banner
-        cv2.rectangle(processed_frame, (0, 0), (w, 58), (20, 20, 20), -1)
-        cv2.putText(processed_frame, f"Student: {name} ({roll_number}) | Pose {count + 1}/5", (15, 24),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 255), 2)
-        cv2.putText(processed_frame, f"Pose Instruction: {instructions[count]}", (15, 49),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 200), 2)
+        # Header Info Banner (Dark modern rounded aesthetic)
+        cv2.rectangle(processed_frame, (0, 0), (w, 64), (18, 18, 18), -1)
+        processed_frame = draw_clean_text(processed_frame, f"Student: {name} ({roll_number}) | Pose {count + 1}/5",
+                                          (16, 8), font_size=18, color=(0, 255, 255), bold=True)
+        processed_frame = draw_clean_text(processed_frame, f"Pose Instruction: {instructions[count]}",
+                                          (16, 34), font_size=16, color=(0, 255, 200), bold=False)
 
         # Status text in center
         cv2.rectangle(processed_frame, (10, h - 85), (w - 10, h - 50), (20, 20, 20), -1)
-        cv2.putText(processed_frame, msg, (20, h - 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.60, color, 2)
+        processed_frame = draw_clean_text(processed_frame, msg, (20, h - 80),
+                                          font_size=16, color=color, bold=True)
 
         # Footer Hint Banner
         cv2.rectangle(processed_frame, (0, h - 45), (w, h), (15, 15, 15), -1)
         hint = "Press 'C' or Spacebar to Capture (Green Only)  |  Press 'Q' or ESC to Cancel"
-        cv2.putText(processed_frame, hint, (20, h - 16),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0) if quality_passed else (180, 180, 180), 2)
+        hint_color = (0, 255, 0) if quality_passed else (180, 180, 180)
+        processed_frame = draw_clean_text(processed_frame, hint, (20, h - 35),
+                                          font_size=14, color=hint_color, bold=False)
 
         cv2.imshow(win_title, processed_frame)
         key = cv2.waitKey(20) & 0xFF

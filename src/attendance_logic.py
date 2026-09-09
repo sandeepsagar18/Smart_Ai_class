@@ -10,6 +10,7 @@ from src.detector import FaceDetector
 from src.recognizer import FaceRecognizer
 from src.anti_spoof import evaluate_liveness, evaluate_face_quality
 from src.database import get_student_info, save_attendance_entry, get_students_by_class, generate_file_checksum, log_security_event
+from src.ui_helpers import draw_clean_text
 from utils.config import (
     ATTENDANCE_DIR, CLASS_PHOTOS_DIR, UNKNOWN_FACES_DIR, CAMERA_ID, BASE_DIR,
     MIN_FACE_SIZE, BLUR_THRESHOLD, MIN_BRIGHTNESS, MAX_BRIGHTNESS, MIN_CONTRAST,
@@ -106,15 +107,15 @@ def start_attendance(subject_info=None):
             cv2.rectangle(display_frame, (10, 10), (750, 155), (20, 20, 20), -1)
             cv2.rectangle(display_frame, (10, 10), (750, 155), (0, 200, 255), 2)
 
-            cv2.putText(display_frame, f"Subject: {sub_code} ({class_title})", (25, 38),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+            draw_clean_text(display_frame, f"Subject: {sub_code} ({class_title})", (25, 20),
+                            font_size=20, color=(0, 255, 255), bold=True)
             teacher_display = f"Teacher: {teacher_name}" + (f" [{teacher_emp_id}]" if teacher_emp_id else "")
-            cv2.putText(display_frame, teacher_display, (25, 68),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
-            cv2.putText(display_frame, f"Section Enrolled: {enrolled_count} Students | Live Faces: {active_count}", (25, 95),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 200), 1)
-            cv2.putText(display_frame, f"Scan Shot {i + 1}/{NUM_SHOTS} - Next Snap: {time_left:.1f}s", (25, 130),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 2)
+            draw_clean_text(display_frame, teacher_display, (25, 52),
+                            font_size=17, color=(200, 200, 200), bold=False)
+            draw_clean_text(display_frame, f"Section Enrolled: {enrolled_count} Students | Live Faces: {active_count}", (25, 80),
+                            font_size=16, color=(0, 255, 200), bold=False)
+            draw_clean_text(display_frame, f"Scan Shot {i + 1}/{NUM_SHOTS} - Next Snap: {time_left:.1f}s", (25, 114),
+                            font_size=21, color=(0, 255, 0), bold=True)
 
             cv2.imshow("SmartClass Vision - Section Attendance Scan", display_frame)
             cv2.waitKey(1)
@@ -134,8 +135,8 @@ def start_attendance(subject_info=None):
             cv2.rectangle(feedback_frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 255, 0), 8)
             cv2.rectangle(feedback_frame, (frame.shape[1] // 2 - 280, 20), (frame.shape[1] // 2 + 280, 85), (20, 20, 20), -1)
             cv2.rectangle(feedback_frame, (frame.shape[1] // 2 - 280, 20), (frame.shape[1] // 2 + 280, 85), (0, 255, 0), 2)
-            cv2.putText(feedback_frame, f"SHOT {i + 1}/{NUM_SHOTS} SECURED", (frame.shape[1] // 2 - 210, 62),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)
+            draw_clean_text(feedback_frame, f"SHOT {i + 1}/{NUM_SHOTS} SECURED",
+                            (frame.shape[1] // 2 - 180, 32), font_size=26, color=(0, 255, 0), bold=True)
             cv2.imshow("SmartClass Vision - Section Attendance Scan", feedback_frame)
             cv2.waitKey(80)
 
@@ -151,14 +152,16 @@ def start_attendance(subject_info=None):
         # Update live visual progress window
         processing_screen = np.zeros((400, 800, 3), dtype="uint8")
         progress_pct = int(((f_idx + 1) / NUM_SHOTS) * 100)
-        cv2.putText(processing_screen, "AI Biometric Verification & Voting...", (50, 90), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-        cv2.putText(processing_screen, f"Evaluating Shot {f_idx + 1} of {NUM_SHOTS} ({progress_pct}%)", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+        draw_clean_text(processing_screen, "AI Biometric Verification & Voting...", (50, 50),
+                        font_size=24, color=(0, 255, 0), bold=True)
+        draw_clean_text(processing_screen, f"Evaluating Shot {f_idx + 1} of {NUM_SHOTS} ({progress_pct}%)", (50, 110),
+                        font_size=20, color=(0, 255, 255), bold=True)
         # Progress bar
-        cv2.rectangle(processing_screen, (50, 180), (750, 210), (50, 50, 50), -1)
+        cv2.rectangle(processing_screen, (50, 170), (750, 200), (50, 50, 50), -1)
         bar_w = int(700 * ((f_idx + 1) / NUM_SHOTS))
-        cv2.rectangle(processing_screen, (50, 180), (50 + bar_w, 210), (0, 255, 0), -1)
-        cv2.putText(processing_screen, f"Auditing against {class_title} ({enrolled_count} students)...",
-                    (50, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (200, 200, 200), 1)
+        cv2.rectangle(processing_screen, (50, 170), (50 + bar_w, 200), (0, 255, 0), -1)
+        draw_clean_text(processing_screen, f"Auditing against {class_title} ({enrolled_count} students)...",
+                        (50, 240), font_size=18, color=(200, 200, 200), bold=False)
         cv2.imshow("SmartClass Vision - Section Attendance Scan", processing_screen)
         cv2.waitKey(1)
 
