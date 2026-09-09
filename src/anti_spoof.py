@@ -122,9 +122,9 @@ def evaluate_liveness(face_crop):
     return _detector.check_liveness(face_crop)
 
 
-def evaluate_face_quality(face_crop, min_size=70, blur_thresh=150.0, min_b=40.0, max_b=225.0, min_contrast=25.0):
+def evaluate_face_quality(face_crop, landmarks=None, min_size=70, blur_thresh=150.0, min_b=40.0, max_b=225.0, min_contrast=25.0, max_yaw_ratio=0.22):
     """
-    Step 4 Quality Gate: Validates bounding-box dimensions, blur, brightness, and contrast.
+    Step 4 Quality Gate: Validates bounding-box dimensions, blur, brightness, contrast, and landmark pose asymmetry.
     Returns:
         passed (bool): Whether the face crop qualifies for biometric recognition.
         reason (str): Human-readable failure reason if rejected.
@@ -142,12 +142,24 @@ def evaluate_face_quality(face_crop, min_size=70, blur_thresh=150.0, min_b=40.0,
     mean_brightness = float(np.mean(gray))
     std_contrast = float(np.std(gray))
 
+    # Pose Asymmetry Heuristic from 5 landmarks (Right Eye, Left Eye, Nose, Right Mouth, Left Mouth)
+    yaw_ratio = 0.0
+    if landmarks is not None and len(landmarks) >= 5:
+        pt_right_eye = landmarks[0]
+        pt_left_eye = landmarks[1]
+        pt_nose = landmarks[2]
+        eye_distance = float(np.linalg.norm(pt_left_eye - pt_right_eye))
+        mid_eyes_x = float((pt_right_eye[0] + pt_left_eye[0]) / 2.0)
+        if eye_distance > 1e-4:
+            yaw_ratio = float(abs(pt_nose[0] - mid_eyes_x) / eye_distance)
+
     metrics = {
         "width": w,
         "height": h,
         "sharpness": round(blur_score, 1),
         "brightness": round(mean_brightness, 1),
-        "contrast": round(std_contrast, 1)
+        "contrast": round(std_contrast, 1),
+        "yaw_ratio": round(yaw_ratio, 3)
     }
 
     if blur_score < blur_thresh:
@@ -162,5 +174,9 @@ def evaluate_face_quality(face_crop, min_size=70, blur_thresh=150.0, min_b=40.0,
     if std_contrast < min_contrast:
         return False, f"LOW_CONTRAST (Contrast {std_contrast:.1f} < {min_contrast})", metrics
 
+    if landmarks is not None and yaw_ratio > max_yaw_ratio:
+        return False, f"FACE_EXTREME_ANGLE (Yaw ratio {yaw_ratio:.2f} > {max_yaw_ratio:.2f})", metrics
+
     return True, "QUALITY_PASSED", metrics
+
 

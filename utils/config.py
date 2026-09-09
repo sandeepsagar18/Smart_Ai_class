@@ -24,6 +24,7 @@ BLUR_THRESHOLD = 150.0           # Minimum Laplacian variance for motion blur re
 MIN_BRIGHTNESS = 40.0            # Minimum average luminance (reject underexposed)
 MAX_BRIGHTNESS = 225.0           # Maximum average luminance (reject overexposed)
 MIN_CONTRAST = 25.0              # Minimum standard deviation of pixels
+MAX_YAW_RATIO = 0.22             # Landmark asymmetry cutoff: abs(NoseX - MidEyesX) / EyeDistance
 
 # YuNet Detection & ArcFace Recognition Thresholds
 YUNET_SCORE_THRESHOLD = 0.75     # DNN face detection confidence cutoff
@@ -32,7 +33,7 @@ AMBIGUITY_MARGIN = 0.06          # Minimum separation between top-1 and top-2 ca
 
 # Temporal Consensus & Attendance Logic
 TOTAL_CAPTURE_SHOTS = 7          # Total multi-angle shots per session
-REQUIRED_CONSISTENT_VOTES = 3    # Required matching votes out of total shots (3 of 7)
+REQUIRED_CONSISTENT_VOTES = 5    # Required matching votes out of total shots (5 of 7)
 SHOT_COUNTDOWN_SECONDS = 1.2     # Countdown interval between shots
 
 # Features

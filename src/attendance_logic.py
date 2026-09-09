@@ -13,7 +13,7 @@ from src.database import get_student_info, save_attendance_entry, get_students_b
 from utils.config import (
     ATTENDANCE_DIR, CLASS_PHOTOS_DIR, UNKNOWN_FACES_DIR, CAMERA_ID, BASE_DIR,
     MIN_FACE_SIZE, BLUR_THRESHOLD, MIN_BRIGHTNESS, MAX_BRIGHTNESS, MIN_CONTRAST,
-    TOTAL_CAPTURE_SHOTS, REQUIRED_CONSISTENT_VOTES, SHOT_COUNTDOWN_SECONDS,
+    MAX_YAW_RATIO, TOTAL_CAPTURE_SHOTS, REQUIRED_CONSISTENT_VOTES, SHOT_COUNTDOWN_SECONDS,
     ARCFACE_SIMILARITY_THRESHOLD, DEBUG_MODE
 )
 
@@ -171,15 +171,26 @@ def start_attendance(subject_info=None):
             aligned_face = face_data["image"]
             coords = face_data["coords"]
             det_score = face_data.get("score", 0.0)
+            landmarks = face_data.get("landmarks")
 
-            # STEP 4: Comprehensive Face-Quality Gate (Size, Blur, Brightness, Contrast)
+            # STEP 4: Comprehensive Face-Quality Gate (Size, Blur, Brightness, Contrast, Pose)
             q_pass, q_reason, q_metrics = evaluate_face_quality(
-                raw_crop, min_size=MIN_FACE_SIZE, blur_thresh=BLUR_THRESHOLD,
-                min_b=MIN_BRIGHTNESS, max_b=MAX_BRIGHTNESS, min_contrast=MIN_CONTRAST
+                raw_crop, landmarks=landmarks, min_size=MIN_FACE_SIZE, blur_thresh=BLUR_THRESHOLD,
+                min_b=MIN_BRIGHTNESS, max_b=MAX_BRIGHTNESS, min_contrast=MIN_CONTRAST,
+                max_yaw_ratio=MAX_YAW_RATIO
             )
             if not q_pass:
                 if DEBUG_MODE:
-                    print(f"  [QUALITY REJECT] Face #{face_idx+1}: {q_reason} | Coords: {coords}")
+                    print(f"\n--- FACE #{face_idx + 1} (SHOT {f_idx + 1}) ---")
+                    print(f"Detection confidence: {det_score:.2f}")
+                    print(f"BBox: {coords[2]-coords[0]}x{coords[3]-coords[1]}")
+                    print(f"Sharpness: {q_metrics.get('sharpness', 0.0)}")
+                    print(f"Brightness: {q_metrics.get('brightness', 0.0)}")
+                    print(f"Contrast: {q_metrics.get('contrast', 0.0)}")
+                    print(f"Yaw ratio: {q_metrics.get('yaw_ratio', 0.0)}")
+                    print(f"Quality: REJECTED ({q_reason})")
+                    print("FINAL: UNKNOWN (Quality Filter)")
+                    print("-" * 30)
                 continue
 
             # Biometric Liveness & Anti-Spoofing Assessment
@@ -215,21 +226,33 @@ def start_attendance(subject_info=None):
                 item_info = valid_live_crops[item_idx]
                 w, h = item_info["metrics"]["width"], item_info["metrics"]["height"]
                 det_score = item_info["det_score"]
+                q_met = item_info["metrics"]
+
+                # Step 11: Structured Debug Output for every detected face
+                if DEBUG_MODE:
+                    print(f"\n--- FACE #{item_idx + 1} (SHOT {f_idx + 1}) ---")
+                    print(f"Detection confidence: {det_score:.2f}")
+                    print(f"BBox: {w}x{h}")
+                    print(f"Sharpness: {q_met.get('sharpness', 0.0)}")
+                    print(f"Brightness: {q_met.get('brightness', 0.0)}")
+                    print(f"Contrast: {q_met.get('contrast', 0.0)}")
+                    print(f"Yaw ratio: {q_met.get('yaw_ratio', 0.0)}")
+                    print("Quality: GOOD")
+                    print("\nTOP MATCHES:")
+                    for top_m in diag.get("top_5", []):
+                        print(f"  {top_m.get('name')} ({top_m.get('roll')}): {top_m.get('sim', 0.0):.4f}")
+                    print(f"\nTop1: {diag.get('top1_name', 'None')} ({diag.get('top1_roll', 'None')})")
+                    print(f"Top1 score: {diag.get('top1_sim', 0.0):.4f}")
+                    print(f"Top2 score: {diag.get('top2_sim', 0.0):.4f}")
+                    print(f"Margin: {diag.get('margin', 0.0):.4f}")
+                    print(f"FINAL: {'UNKNOWN (' + diag.get('reason', '') + ')' if roll_number == 'Unknown' else diag.get('top1_name', roll_number) + ' -> VERIFIED'}")
+                    print("-" * 30)
 
                 if roll_number != "Unknown":
                     student_detections[roll_number] = student_detections.get(roll_number, 0) + 1
                     if roll_number not in student_similarities:
                         student_similarities[roll_number] = []
                     student_similarities[roll_number].append(diag.get("top1_sim", confidence / 100.0))
-                    
-                    if DEBUG_MODE:
-                        print(f"  [DEBUG STEP 10 - VERIFIED] Roll: {roll_number} | Sim: {diag.get('top1_sim', 0):.3f} (Conf: {confidence}%) | "
-                              f"Det: {det_score:.2f} | BBox: {w}x{h} | Margin: {diag.get('margin', 0):.3f}")
-                else:
-                    if DEBUG_MODE:
-                        print(f"  [DEBUG STEP 10 - UNKNOWN] Reason: {diag.get('reason', 'UNKNOWN')} | "
-                              f"Top Candidate: {diag.get('top1_roll', 'None')} (Sim: {diag.get('top1_sim', 0):.3f} < {ARCFACE_SIMILARITY_THRESHOLD}) | "
-                              f"Det: {det_score:.2f} | BBox: {w}x{h}")
 
     cv2.destroyAllWindows()
 
@@ -249,6 +272,8 @@ def start_attendance(subject_info=None):
             continue
 
         s_roll, s_name, s_gender, s_degree, s_year, s_branch, s_section, _ = info
+        sim_scores = student_similarities.get(roll, [])
+        avg_similarity = float(np.mean(sim_scores)) if sim_scores else 0.0
 
         # Strict Section & Branch validation
         match_degree = (target_degree is None or s_degree.strip().upper() == target_degree.strip().upper())
@@ -258,9 +283,12 @@ def start_attendance(subject_info=None):
 
         is_correct_section = match_degree and match_year and match_branch and match_section
 
-        if count >= REQUIRED_MATCHES:
+        # Step 5 & 6: Strengthened Temporal Consensus (at least 5/7 votes AND mean similarity >= 0.65)
+        passed_consensus = (count >= REQUIRED_MATCHES) and (avg_similarity >= ARCFACE_SIMILARITY_THRESHOLD)
+
+        if passed_consensus:
             if is_correct_section:
-                print(f"[VERIFIED - SECTION MATCH] {s_name} ({s_roll}) -> {s_branch} Sec {s_section} -> PRESENT")
+                print(f"[VERIFIED - SECTION MATCH] {s_name} ({s_roll}) -> {s_branch} Sec {s_section} -> PRESENT (Votes: {count}/{NUM_SHOTS}, Avg Sim: {avg_similarity:.3f})")
                 attendance_list.append({
                     "Subject Code": sub_code,
                     "Subject Name": sub_name,
@@ -287,14 +315,13 @@ def start_attendance(subject_info=None):
                 if not match_branch: mismatch_reasons.append(f"Branch '{s_branch}' != target '{target_branch}'")
                 if not match_section: mismatch_reasons.append(f"Section '{s_section}' != target '{target_section}'")
                 reason_str = ", ".join(mismatch_reasons)
-                print(f"[REJECTED - WRONG CLASS/SECTION] Student {s_name} ({s_roll}) [{s_degree} {s_year} {s_branch} Sec {s_section}] does not match target class [{target_degree} {target_year} {target_branch} Sec {target_section}]! ({reason_str}). Attendance denied.")
+                print(f"[REJECTED - WRONG CLASS/SECTION] Student {s_name} ({s_roll}) [{s_degree} {s_year} {s_branch} Sec {s_section}] does not match target class [{target_degree} {target_year} {target_branch} Sec {target_section}]! ({reason_str}, Votes: {count}/{NUM_SHOTS}, Avg Sim: {avg_similarity:.3f}). Attendance denied.")
                 rejected_wrong_section.append({
                     "roll": s_roll, "name": s_name, "enrolled": f"{s_degree} {s_year} {s_branch} Sec {s_section}"
                 })
-        elif count < REQUIRED_MATCHES:
-            # Only report low matches if the student is actually enrolled in this class/section
-            if is_correct_section:
-                print(f"[REJECTED - LOW MATCHES] {s_name} ({s_roll}) only detected in {count}/{NUM_SHOTS} shots -> Glitch discarded.")
+        else:
+            print(f"[REJECTED - INSUFFICIENT CONSENSUS] {s_name} ({s_roll}): Votes={count}/{NUM_SHOTS} (Required: {REQUIRED_MATCHES}), Avg Sim={avg_similarity:.3f} (Required: {ARCFACE_SIMILARITY_THRESHOLD}) -> Attendance denied.")
+
 
     filename = None
     hmac_sig = None
