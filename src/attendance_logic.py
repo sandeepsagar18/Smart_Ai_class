@@ -73,15 +73,15 @@ def start_attendance(subject_info=None):
     # Force High Definition
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-    NUM_SHOTS = 3
+    NUM_SHOTS = 5
     REQUIRED_MATCHES = 2
-    SHOT_INTERVAL = 2.5
+    SHOT_INTERVAL = 1.5
     captured_frames = []
 
     # Extract target section student roll numbers for context-aware priority matching
     enrolled_roll_numbers = [str(s[0]) for s in enrolled_students] if enrolled_students else []
 
-    print("[INFO] Initiating High-Speed Multi-Shot Batch Capture with Live Overlays...")
+    print("[INFO] Initiating 5-Shot Multi-Angle Batch Capture with Live Overlays...")
 
     # PHASE 1: BATCH CAPTURE WITH REAL-TIME MULTI-FACE DETECTION
     for i in range(NUM_SHOTS):
