@@ -60,17 +60,8 @@ class FaceRecognizer:
             best_match = "Unknown"
             best_distance = float("inf")
 
-            # If candidates provided (e.g. section students), search candidate pool first
-            search_pool = self.known_embeddings
-            effective_threshold = self.threshold
-            if candidate_rolls:
-                filtered_pool = {k: v for k, v in self.known_embeddings.items() if str(k) in [str(r) for r in candidate_rolls]}
-                if filtered_pool:
-                    search_pool = filtered_pool
-                    # Generous angular tolerance for enrolled section roster
-                    effective_threshold = 0.42
-
-            for roll_number, saved_embeddings in search_pool.items():
+            # Compare against the full known embedding library fairly
+            for roll_number, saved_embeddings in self.known_embeddings.items():
                 for saved_emb in saved_embeddings:
                     saved_emb = np.array(saved_emb)
                     distance = np.dot(live_embedding, saved_emb) / (
@@ -81,8 +72,9 @@ class FaceRecognizer:
                         best_distance = cosine_distance
                         best_match = roll_number
 
-            if best_distance < effective_threshold:
-                confidence = round((1 - (best_distance / effective_threshold)) * 100, 2)
+            # ArcFace cosine distance threshold (strictly <= 0.35)
+            if best_distance < self.threshold:
+                confidence = round((1 - (best_distance / self.threshold)) * 100, 2)
                 return best_match, confidence
             else:
                 return "Unknown", 0.0

@@ -76,7 +76,7 @@ def start_attendance(subject_info=None):
     time.sleep(2)
 
     NUM_SHOTS = 5
-    REQUIRED_MATCHES = 1
+    REQUIRED_MATCHES = 2
     captured_frames = []
 
     # Extract target section student roll numbers for context-aware priority matching
