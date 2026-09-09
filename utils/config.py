@@ -28,12 +28,12 @@ MAX_YAW_RATIO = 0.28             # Landmark asymmetry cutoff: abs(NoseX - MidEye
 
 # YuNet Detection & ArcFace Recognition Thresholds
 YUNET_SCORE_THRESHOLD = 0.60     # DNN face detection confidence cutoff (detects distant/slanted faces)
-ARCFACE_SIMILARITY_THRESHOLD = 0.65 # Cosine similarity required to verify identity (distance <= 0.35)
+ARCFACE_SIMILARITY_THRESHOLD = 0.58 # Robust cosine similarity threshold (tolerates natural hand resting & lighting)
 AMBIGUITY_MARGIN = 0.06          # Minimum separation between top-1 and top-2 candidate similarities
 
 # Temporal Consensus & Attendance Logic
 TOTAL_CAPTURE_SHOTS = 10         # Total multi-angle shots per session (~25 seconds total capture window)
-REQUIRED_CONSISTENT_VOTES = 4    # Minimum consistent matching images required out of 10 shots to mark attendance
+REQUIRED_CONSISTENT_VOTES = 3    # Minimum consistent matching images required out of 10 shots to mark attendance
 SHOT_COUNTDOWN_SECONDS = 2.5     # Countdown interval between shots
 
 # Features

@@ -1,52 +1,47 @@
-# 🎓 SmartClass Vision (v0.2 Enterprise Edition)
+﻿# 🎓 SmartClass Vision (v0.2 Enterprise Edition)
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![CustomTkinter](https://img.shields.io/badge/GUI-CustomTkinter-blueviolet.svg)](https://github.com/TomSchimansky/CustomTkinter)
 [![OpenCV YuNet](https://img.shields.io/badge/Face%20Detection-OpenCV%20YuNet%20DNN-brightgreen.svg)](https://github.com/opencv/opencv_zoo)
-[![DeepFace](https://img.shields.io/badge/Recognition-FaceNet512%20%2F%20ArcFace-orange.svg)](https://github.com/serengil/deepface)
+[![ArcFace](https://img.shields.io/badge/Face%20Recognition-InsightFace%20ArcFace-orange.svg)](https://github.com/deepinsight/insightface)
 [![SQLite](https://img.shields.io/badge/Database-SQLite-lightgrey.svg)](https://www.sqlite.org/)
 
-An automated, high-precision **AI-Powered Face Recognition Attendance & Management System** built with **OpenCV YuNet Deep Neural Network**, **DeepFace (FaceNet512 / ArcFace)**, and **CustomTkinter**. Designed specifically for institutional classrooms, **SmartClass Vision** eliminates proxy attendance, enforces strict branch/section isolation, provides multi-layered anti-spoofing protection, and offers a comprehensive role-based administrative control suite.
+An automated, high-precision **AI-Powered Face Recognition Attendance & Classroom Management System** built with **OpenCV YuNet Deep Neural Network (DNN)**, **ArcFace Biometric Embeddings**, and **CustomTkinter**. Designed specifically for academic institutions, **SmartClass Vision** eliminates proxy attendance, enforces strict branch/section isolation, provides multi-layered anti-spoofing protection, and offers a comprehensive role-based administrative control suite.
 
 ---
 
 ## 🌟 Key Highlights & Features
 
-### 👁️ Dedicated Human Face Detection & Recognition
-- **OpenCV YuNet DNN Detector**: Dedicated human face detection neural network. Exclusively tracks human facial landmarks and **100% ignores background non-face objects** (such as TV screens, monitors, chairs, and windows).
-- **FaceNet512 Embeddings with Section-Aware Prioritizing**: During class attendance, the AI prioritizes matching against the specific enrolled section roster ($O(K)$ search reduction), eliminating cross-section student confusion.
-- **Real-Time Multi-Face Bounding Overlays**: Live video scanner displays real-time face bounding boxes and an active student counter (`Live Faces: X`).
-- **Single-Shot Consensus (`REQUIRED_MATCHES = 1`)**: Fast temporal consensus with hardware camera buffer flush, ensuring no enrolled student is discarded as a glitch.
+### 👁️ High-Accuracy Face Detection & Recognition
+- **OpenCV YuNet DNN Detector**: Dedicated neural network detecting frontal and angled human faces, filtering out non-human background objects.
+- **YuNet 5-Point Landmark Affine Alignment**: Standardized 112×112 facial alignment based on eye, nose, and mouth corner coordinates to normalize head pose before feature extraction.
+- **InsightFace ArcFace 512-D Embeddings**: Vectorized ArcFace backbone utilizing Cosine Similarity with quality-filtered student centroid models.
+- **10-Shot Multi-Angle Temporal Consensus**: Captures 10 successive audit frames over a ~25-second window. Any student must achieve at least 3 consistent high-similarity matches (>= 0.58) across the capture window to verify presence.
+- **Ambiguity Margin Guard**: Enforces minimum separation (>= 0.06) between top-1 and top-2 candidates, preventing false matches between similar-looking students.
 
-### 📸 Intelligent Student Registration Quality Gate
-- **Real-Time Blur & Sharpness Gate**: Uses Laplacian variance analysis (`threshold >= 80.0`). Motion-blurred frames are rejected in real-time.
-- **Exposure & Lighting Check**: Automatic Luma analysis (`45 <= Brightness <= 210`) prevents shadows or overexposed captures.
-- **Face Resolution & Distance Threshold**: Ensures minimum face crop size (`>= 70x70 px`) so students are properly framed.
-- **Center Alignment Guard**: Prevents truncated or cut-off face captures along camera borders.
+### 📸 Intelligent Student Registration & Face Quality Gate
+- **Pose & Yaw Asymmetry Filter**: Landmark asymmetry gating rejects extreme side-profile angles during registration and scanning.
+- **Laplacian Sharpness Analysis**: Automatically filters out motion-blurred frames.
+- **Luma Exposure & Contrast Checking**: Dynamic brightness and contrast analysis ensures proper indoor lighting before accepting facial embeddings into memory.
+- **Minimum Resolution Gate**: Prevents truncated or low-resolution face crops (< 45px) from degrading recognition accuracy.
 
-### 🛡️ Multi-Layer Anti-Spoofing & Liveness Detection
-- **Texture Analysis**: Laplacian variance frequency filtering to detect low-frequency blur from printed photos or paper masks.
-- **Chromatic Reflection Check**: Color channel balance analysis to detect phone, tablet, and monitor screen reflection artifacts.
-- **Dynamic Motion & Blink Verification**: Real-time facial micro-motion checks during active class scan mode.
+### 🛡️ Multi-Layer Anti-Spoofing & Security
+- **Texture Analysis**: High-frequency texture and Laplacian variance inspection to detect printed photo attacks and paper cutouts.
+- **Chromatic Reflection Check**: Color-channel distribution analysis to block screen replays from smartphones, tablets, or laptops.
+- **Audit Trails**: Security incidents and spoof attempts are recorded with snapshots stored in `data/unknown_faces/`.
+- **HMAC-SHA256 Cryptographic Signing**: Every attendance CSV sheet generated is cryptographically signed with HMAC-SHA256 to guarantee audit immutability and tamper resistance.
 
-### 🗑️ Granular Attendance Deletion (Admin Portal)
-- **Particular Student Deletion**: Delete attendance for a specific student by Roll Number with optional Date / Subject filters.
-- **Particular Batch Deletion**: Purge attendance for an entire class batch (Branch + Section) with single-click `TODAY` quick filters.
-- **Dual-Store Synchronization**: Instantly deletes matching records from both SQLite Database (`smartclass.db`) and CSV audit sheets (`data/attendance_records/`).
-- **Security Confirmation & Audit Trails**: Every deletion requires Admin password re-authentication and is permanently logged in the Enterprise Security Audit Trail.
+### 🔒 Role-Based Access Control & Strict Section Isolation
+- **Dual-Tier Authentication**: Faculty (Teacher) and System Administrator role isolation with Argon2 / PBKDF2 credential hashing.
+- **Section & Branch Validation**: Validates that recognized students belong to the target Course, Degree, Year, Branch, and Section before granting attendance. Cross-section attendees are logged and rejected.
+- **Brute-Force Lockout Defense**: Progressive lockout protection against automated password guessing.
+- **Admin Master Key Verification**: Institutional security key required to authorize administrator account creation.
 
-### 🔒 Role-Based Access Control & Section Isolation
-- **Dual-Tier Authentication**: Secure role isolation for **Faculty (Teachers)** and **Institutional Administrators**.
-- **Section & Branch Isolation**: Teachers are restricted to scanning attendance only for students enrolled in their assigned degree, year, branch, and section.
-- **Brute-Force Lockout Defense**: Progressive lockout defense against repeated failed password attempts.
-- **Admin Master Key Verification**: Institutional authorization key required to register administrator accounts.
-
-### 📊 Administrative Command Center & Audit Suite
-- **Faculty Management**: Allot subjects, reassign faculty, reset credentials, promote/demote administrator rights.
-- **Student Directory & Section Transfers**: Real-time roster search, batch student enrollment, section transfers, and deletion.
-- **Curriculum Matrix**: Comprehensive mappings between courses, semesters, branches, sections, and faculty members.
-- **HMAC Cryptographic Signing**: Every recorded attendance entry is cryptographically hashed with SHA-256 HMAC signatures to prevent tampering.
-- **Automated Database Backups**: One-click SQLite snapshots and system health diagnostics.
+### 📊 Administrative Command Center & GUI Dashboard
+- **Real-Time Section Roster**: Dashboard table automatically updates and highlights verified students as **PRESENT** in green immediately upon scan completion.
+- **Granular Record Management**: Delete single student records or entire batch section records directly with admin authorization.
+- **Curriculum & Faculty Matrix**: Map subjects, faculty members, sections, and student allocations.
+- **Automated Database Backups**: One-click SQLite snapshots and database integrity restoration.
 
 ---
 
@@ -54,12 +49,13 @@ An automated, high-precision **AI-Powered Face Recognition Attendance & Manageme
 
 | Layer | Technologies |
 | :--- | :--- |
-| **GUI & UI Design** | CustomTkinter (Dark Mode, Responsive Kiosk Layout) |
+| **GUI & UI Design** | CustomTkinter (Dark Mode, Responsive Layout) |
 | **Face Detection** | OpenCV YuNet Deep Neural Network (`face_detection_yunet_2023mar.onnx`) |
-| **Face Embeddings** | DeepFace (FaceNet512 Architecture) |
+| **Face Alignment** | 5-Point Landmark Affine Transformation (112×112) |
+| **Face Recognition**| DeepFace / ArcFace (512-D Cosine Centroids) |
 | **Computer Vision** | OpenCV (`cv2`), NumPy, PIL |
 | **Database & Storage**| SQLite3, Pandas, Pickle |
-| **Security & Audits** | Argon2 / PBKDF2 Hashing, HMAC-SHA256, Integrity Checksums |
+| **Security & Audits** | PBKDF2 / Argon2, HMAC-SHA256, Audit Logging |
 
 ---
 
@@ -68,16 +64,22 @@ An automated, high-precision **AI-Powered Face Recognition Attendance & Manageme
 ```text
 SmartClassVision/
 ├── data/                       # Local database, unknown face captures, embeddings
-│   ├── attendance/             # Auto-generated daily attendance CSV sheets
+│   ├── attendance_records/     # Auto-generated daily attendance CSV sheets
 │   ├── backups/                # SQLite database snapshots
-│   ├── students/               # Enrolled student face capture datasets
-│   └── smartclass.db           # Master SQLite relational database
+│   ├── class_photos/           # Timestamped multi-shot audit photos
+│   ├── database/               # Master SQLite database (smartclass.db)
+│   ├── known_faces/            # Enrolled student face capture datasets (by Roll Number)
+│   ├── unknown_faces/          # Spoof incident and audit snapshots
+│   └── embeddings.pkl          # Precomputed quality-filtered ArcFace centroids
+├── models/                     # Deep learning model weights
+│   ├── face_detection_yunet_2023mar.onnx
+│   └── weights/arcface_weights.h5
 ├── src/                        # Core application modules
-│   ├── anti_spoof.py           # Texture, reflection, and liveness analysis
-│   ├── attendance_logic.py     # Real-time multi-shot attendance capture engine
+│   ├── anti_spoof.py           # Texture, reflection, blur, and pose quality gates
+│   ├── attendance_logic.py     # 10-shot temporal consensus attendance engine
 │   ├── database.py             # SQLite schema, HMAC signing, RBAC, and queries
-│   ├── detector.py             # OpenCV YuNet dedicated DNN human face detector
-│   ├── recognizer.py           # InsightFace ArcFace 512-D embedding extraction & matching
+│   ├── detector.py             # OpenCV YuNet DNN detector with 5-point alignment
+│   ├── recognizer.py           # Vectorized ArcFace inference & centroid matching
 │   └── registration.py         # Multi-shot student dataset registration
 ├── utils/
 │   └── config.py               # Path configurations and global constants
@@ -138,7 +140,7 @@ Upon first run, the database automatically initializes a default Administrator a
 | :--- | :--- | :--- |
 | **System Administrator** | `ADMIN01` | `admin123` |
 
-> ⚠️ **Security Notice**: Change the default administrator password immediately after initial login via the top session bar. Default Admin Master Key for creating new admin accounts: `SmartClass@Admin#2026`.
+> ⚠️ **Security Notice**: Change the default administrator password immediately after initial login via the session bar. Default Admin Master Key for creating new admin accounts: `SmartClass@Admin#2026`.
 
 ---
 
@@ -171,4 +173,3 @@ Developed & Maintained by **Sandeep Sagar**
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
