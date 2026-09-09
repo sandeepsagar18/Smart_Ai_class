@@ -10,6 +10,7 @@ from pathlib import Path
 import threading
 import pandas as pd
 import pickle
+from PIL import Image, ImageTk
 
 from src.database import (
     init_db, authenticate_teacher, register_teacher_secure,
@@ -971,17 +972,119 @@ class SmartClassApp(ctk.CTk):
         if not self.require_login():
             return
 
-        roll = self.prompt_input("Search Student Database", "Enter Roll Number to search:")
-        if roll and roll.isdigit():
-            from src.registration import search_student_record
-            found, record, img_count = search_student_record(roll)
-            if found:
-                info = (
-                    f"Roll Number: {record[0]}\nName: {record[1]}\nGender: {record[2]}\nDegree: {record[3]}\nYear: {record[4]}\n"
-                    f"Branch: {record[5]}\nSection: {record[6]}\nRegistered: {record[7]}\nFace Images: {img_count}/5")
-                self.show_info("Record Found", info)
-            else:
-                self.show_error("Not Found", f"No record found for Roll Number {roll}")
+        roll = self.prompt_input("Search Student Directory", "Enter Roll Number to look up student profile:")
+        if not roll:
+            return
+
+        roll_clean = roll.strip()
+        from src.registration import search_student_record
+        found, record, img_count = search_student_record(roll_clean)
+
+        if not found:
+            self.show_error("Student Not Found", f"No registered record exists for Roll Number '{roll_clean}'.")
+            return
+
+        # Create Modern Student Profile Card Modal
+        profile_win = ctk.CTkToplevel(self)
+        profile_win.title(f"Student Profile - {record[1]} ({record[0]})")
+        profile_win.geometry("540x510")
+        profile_win.resizable(False, False)
+        profile_win.transient(self)
+        profile_win.lift()
+        profile_win.attributes('-topmost', True)
+        profile_win.focus_force()
+        profile_win.grab_set()
+
+        # Center on screen
+        profile_win.update_idletasks()
+        try:
+            pw, ph = self.winfo_width(), self.winfo_height()
+            px, py = self.winfo_rootx(), self.winfo_rooty()
+            x = px + (pw - 540) // 2
+            y = py + (ph - 510) // 2
+            profile_win.geometry(f"+{max(20, x)}+{max(20, y)}")
+        except Exception:
+            pass
+
+        # Card Container
+        card = ctk.CTkFrame(profile_win, corner_radius=16, fg_color="#181824", border_width=1, border_color="#2b2d42")
+        card.pack(fill="both", expand=True, padx=16, pady=16)
+
+        # Header with verified badge
+        header = ctk.CTkFrame(card, fg_color="transparent")
+        header.pack(fill="x", padx=16, pady=(14, 10))
+
+        title_lbl = ctk.CTkLabel(header, text="🎓 Verified Student Profile", font=ctk.CTkFont(size=18, weight="bold"),
+                                 text_color="#00ffcc")
+        title_lbl.pack(side="left")
+
+        status_badge = ctk.CTkFrame(header, corner_radius=12, fg_color="#003828")
+        status_badge.pack(side="right")
+        ctk.CTkLabel(status_badge, text=f"📸 {img_count}/5 Enrolled", font=ctk.CTkFont(size=11, weight="bold"),
+                     text_color="#00ffcc").pack(padx=10, pady=3)
+
+        # Main Body: Left (Photo Preview) & Right (Details Grid)
+        body = ctk.CTkFrame(card, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=14, pady=4)
+        body.grid_columnconfigure(0, weight=0)
+        body.grid_columnconfigure(1, weight=1)
+
+        # Photo Preview Frame
+        photo_box = ctk.CTkFrame(body, width=140, height=155, corner_radius=12, fg_color="#0f1017",
+                                 border_width=1, border_color="#27293d")
+        photo_box.grid(row=0, column=0, padx=(0, 14), pady=4, sticky="n")
+        photo_box.pack_propagate(False)
+
+        # Attempt to load first captured face photo
+        student_dir = Path(BASE_DIR) / "data" / "known_faces" / roll_clean
+        photo_loaded = False
+        if student_dir.exists():
+            photos = sorted(list(student_dir.glob("*.jpg")))
+            if photos:
+                try:
+                    pil_img = Image.open(photos[0])
+                    ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(130, 140))
+                    lbl_photo = ctk.CTkLabel(photo_box, image=ctk_img, text="")
+                    lbl_photo.pack(expand=True, pady=4)
+                    photo_loaded = True
+                except Exception:
+                    photo_loaded = False
+
+        if not photo_loaded:
+            ctk.CTkLabel(photo_box, text="👤", font=ctk.CTkFont(size=48)).pack(expand=True, pady=(20, 0))
+            ctk.CTkLabel(photo_box, text="Face Photo", font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(0, 15))
+
+        # Details Grid
+        details_frame = ctk.CTkFrame(body, corner_radius=12, fg_color="#12131d", border_width=1, border_color="#222333")
+        details_frame.grid(row=0, column=1, sticky="nsew", pady=4)
+        details_frame.grid_columnconfigure(1, weight=1)
+
+        fields = [
+            ("Roll Number", record[0], "#38bdf8"),
+            ("Full Name", record[1], "#ffffff"),
+            ("Gender", record[2], "#cbd5e1"),
+            ("Degree", record[3], "#c084fc"),
+            ("Academic Year", record[4], "#cbd5e1"),
+            ("Branch", record[5], "#38bdf8"),
+            ("Section", f"Section {record[6]}", "#00ffcc"),
+            ("Registered On", str(record[7]).split()[0] if record[7] else "N/A", "#94a3b8")
+        ]
+
+        for idx, (label, val, val_color) in enumerate(fields):
+            ctk.CTkLabel(details_frame, text=f"{label}:", font=ctk.CTkFont(size=11, weight="bold"),
+                         text_color="#64748b", anchor="w").grid(row=idx, column=0, padx=(12, 8), pady=3, sticky="w")
+            ctk.CTkLabel(details_frame, text=str(val), font=ctk.CTkFont(size=12, weight="bold"),
+                         text_color=val_color, anchor="w").grid(row=idx, column=1, padx=4, pady=3, sticky="w")
+
+        # Bottom Action Bar
+        btn_bar = ctk.CTkFrame(card, fg_color="transparent")
+        btn_bar.pack(fill="x", padx=14, pady=(12, 6))
+
+        def close_profile():
+            profile_win.destroy()
+
+        ctk.CTkButton(btn_bar, text="Done / Close", command=close_profile, height=36, width=130,
+                      fg_color="#1f538d", hover_color="#14375e", font=ctk.CTkFont(weight="bold")).pack(side="right")
 
     def delete_student(self):
         if not self.require_admin():
