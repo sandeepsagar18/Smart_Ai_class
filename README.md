@@ -1,4 +1,4 @@
-﻿# 🎓 SmartClass Vision (v0.2 Enterprise Edition)
+﻿# 🎓 SmartClass Vision
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![CustomTkinter](https://img.shields.io/badge/GUI-CustomTkinter-blueviolet.svg)](https://github.com/TomSchimansky/CustomTkinter)
@@ -6,158 +6,115 @@
 [![ArcFace](https://img.shields.io/badge/Face%20Recognition-InsightFace%20ArcFace-orange.svg)](https://github.com/deepinsight/insightface)
 [![SQLite](https://img.shields.io/badge/Database-SQLite-lightgrey.svg)](https://www.sqlite.org/)
 
-An automated, high-precision **AI-Powered Face Recognition Attendance & Classroom Management System** built with **OpenCV YuNet Deep Neural Network (DNN)**, **ArcFace Biometric Embeddings**, and **CustomTkinter**. Designed specifically for academic institutions, **SmartClass Vision** eliminates proxy attendance, enforces strict branch/section isolation, provides multi-layered anti-spoofing protection, and offers a comprehensive role-based administrative control suite.
+An automated, high-precision **AI-Powered Face Recognition Attendance & Classroom Management System** built with **OpenCV YuNet Deep Neural Network (DNN)**, **InsightFace ArcFace 512-D Embeddings**, and **CustomTkinter**. Designed specifically for colleges and schools to eliminate proxy attendance, enforce strict section isolation, provide anti-spoofing defense, and deliver comprehensive administrative control.
 
 ---
 
-## 🌟 Key Highlights & Features
+## 🚀 Key System Capabilities
 
-### 👁️ High-Accuracy Face Detection & Recognition
-- **OpenCV YuNet DNN Detector**: Dedicated neural network detecting frontal and angled human faces, filtering out non-human background objects.
-- **YuNet 5-Point Landmark Affine Alignment**: Standardized 112×112 facial alignment based on eye, nose, and mouth corner coordinates to normalize head pose before feature extraction.
-- **InsightFace ArcFace 512-D Embeddings**: Vectorized ArcFace backbone utilizing Cosine Similarity with quality-filtered student centroid models.
-- **10-Shot Multi-Angle Temporal Consensus**: Captures 10 successive audit frames over a ~25-second window. Any student must achieve at least 3 consistent high-similarity matches (>= 0.58) across the capture window to verify presence.
-- **Ambiguity Margin Guard**: Enforces minimum separation (>= 0.06) between top-1 and top-2 candidates, preventing false matches between similar-looking students.
+### 1. OpenCV YuNet DNN Face Detection & 5-Point Alignment
+- **Dedicated Face Detection DNN**: Uses `face_detection_yunet_2023mar.onnx` to detect human faces in real time while ignoring non-face background objects (monitors, chairs, posters).
+- **5-Point Landmark Normalization**: Automatically extracts 5 key facial coordinates (both eyes, nose tip, both mouth corners) and applies an affine transformation to normalize head pose into standard $112 \times 112$ aligned crops before recognition.
 
-### 📸 Intelligent Student Registration & Face Quality Gate
-- **Pose & Yaw Asymmetry Filter**: Landmark asymmetry gating rejects extreme side-profile angles during registration and scanning.
-- **Laplacian Sharpness Analysis**: Automatically filters out motion-blurred frames.
-- **Luma Exposure & Contrast Checking**: Dynamic brightness and contrast analysis ensures proper indoor lighting before accepting facial embeddings into memory.
-- **Minimum Resolution Gate**: Prevents truncated or low-resolution face crops (< 45px) from degrading recognition accuracy.
+### 2. InsightFace ArcFace Biometric Recognition
+- **512-Dimensional Deep Metric Hyperspace**: Live faces are encoded with ArcFace (Additive Angular Margin Loss) deep learning feature vectors.
+- **Centroid Profile Matching**: Computes Cosine Similarity against quality-filtered student centroid models.
+- **Ambiguity Margin Guard**: Requires top match to hold a $\ge 0.06$ margin over the second-place candidate to avoid false identity swaps.
 
-### 🛡️ Multi-Layer Anti-Spoofing & Security
-- **Texture Analysis**: High-frequency texture and Laplacian variance inspection to detect printed photo attacks and paper cutouts.
-- **Chromatic Reflection Check**: Color-channel distribution analysis to block screen replays from smartphones, tablets, or laptops.
-- **Audit Trails**: Security incidents and spoof attempts are recorded with snapshots stored in `data/unknown_faces/`.
-- **HMAC-SHA256 Cryptographic Signing**: Every attendance CSV sheet generated is cryptographically signed with HMAC-SHA256 to guarantee audit immutability and tamper resistance.
+### 3. Multi-Shot Temporal Consensus Engine
+- **25-Second Batch Scanning**: Captures 10 multi-angle audit frames over ~25 seconds with a 2.5-second interval between snaps.
+- **Consensus Rule**: A student must achieve at least 3 high-similarity matches ($\ge 0.58$) across the 10 shots to pass consensus and be marked **PRESENT**.
+- **Real-Time Section Roster Update**: Immediately switches the dashboard view to the scanned class and updates attendance status to **PRESENT** in green.
 
-### 🔒 Role-Based Access Control & Strict Section Isolation
-- **Dual-Tier Authentication**: Faculty (Teacher) and System Administrator role isolation with Argon2 / PBKDF2 credential hashing.
-- **Section & Branch Validation**: Validates that recognized students belong to the target Course, Degree, Year, Branch, and Section before granting attendance. Cross-section attendees are logged and rejected.
-- **Brute-Force Lockout Defense**: Progressive lockout protection against automated password guessing.
-- **Admin Master Key Verification**: Institutional security key required to authorize administrator account creation.
-
-### 📊 Administrative Command Center & GUI Dashboard
-- **Real-Time Section Roster**: Dashboard table automatically updates and highlights verified students as **PRESENT** in green immediately upon scan completion.
-- **Granular Record Management**: Delete single student records or entire batch section records directly with admin authorization.
-- **Curriculum & Faculty Matrix**: Map subjects, faculty members, sections, and student allocations.
-- **Automated Database Backups**: One-click SQLite snapshots and database integrity restoration.
+### 4. Enterprise Security & Anti-Spoofing
+- **Face Quality Gates**: Rejects motion blur via Laplacian variance, enforces balanced illumination, and discards extreme side-profile poses.
+- **Anti-Spoofing Defense**: Texture and chromatic balance analysis to detect printed photo attacks and screen replays.
+- **Section & Branch Isolation**: Only marks attendance for students registered in the teacher's selected Degree, Year, Branch, and Section. Out-of-section faces are rejected.
+- **Cryptographic HMAC-SHA256 Signing**: Every generated CSV attendance sheet is digitally signed with an HMAC-SHA256 signature to guarantee tamper-proof audit records.
 
 ---
 
 ## 🛠️ Technology Stack
 
-| Layer | Technologies |
-| :--- | :--- |
-| **GUI & UI Design** | CustomTkinter (Dark Mode, Responsive Layout) |
-| **Face Detection** | OpenCV YuNet Deep Neural Network (`face_detection_yunet_2023mar.onnx`) |
-| **Face Alignment** | 5-Point Landmark Affine Transformation (112×112) |
-| **Face Recognition**| DeepFace / ArcFace (512-D Cosine Centroids) |
-| **Computer Vision** | OpenCV (`cv2`), NumPy, PIL |
-| **Database & Storage**| SQLite3, Pandas, Pickle |
-| **Security & Audits** | PBKDF2 / Argon2, HMAC-SHA256, Audit Logging |
+| Component | Technology | Purpose |
+| :--- | :--- | :--- |
+| **GUI Framework** | CustomTkinter | Modern dark-mode responsive kiosk interface |
+| **Face Detection** | OpenCV YuNet DNN (`ONNX`) | Real-time face detection and 5-point landmark extraction |
+| **Face Alignment** | Affine Transformation | Standardized $112 \times 112$ canonical face crops |
+| **Face Recognition** | InsightFace ArcFace | 512-D angular margin biometric embeddings |
+| **Computer Vision** | OpenCV (`cv2`), NumPy, PIL | Image transformations, Laplacian filtering, video streaming |
+| **Database** | SQLite3, Pandas, Pickle | Student database, subject enrollment, centroid storage |
+| **Security** | Argon2 / PBKDF2, HMAC-SHA256 | Credential hashing and tamper-proof attendance sheets |
 
 ---
 
-## 📂 Project Structure
+## 📂 Project Architecture
 
 ```text
 SmartClassVision/
-├── data/                       # Local database, unknown face captures, embeddings
-│   ├── attendance_records/     # Auto-generated daily attendance CSV sheets
+├── data/
+│   ├── attendance_records/     # Auto-generated and cryptographically signed CSV sheets
 │   ├── backups/                # SQLite database snapshots
-│   ├── class_photos/           # Timestamped multi-shot audit photos
+│   ├── class_photos/           # Timestamped 10-shot session audit photos
 │   ├── database/               # Master SQLite database (smartclass.db)
-│   ├── known_faces/            # Enrolled student face capture datasets (by Roll Number)
-│   ├── unknown_faces/          # Spoof incident and audit snapshots
-│   └── embeddings.pkl          # Precomputed quality-filtered ArcFace centroids
-├── models/                     # Deep learning model weights
-│   ├── face_detection_yunet_2023mar.onnx
-│   └── weights/arcface_weights.h5
-├── src/                        # Core application modules
-│   ├── anti_spoof.py           # Texture, reflection, blur, and pose quality gates
-│   ├── attendance_logic.py     # 10-shot temporal consensus attendance engine
-│   ├── database.py             # SQLite schema, HMAC signing, RBAC, and queries
+│   ├── known_faces/            # 5-shot student registration photos (by Roll Number)
+│   ├── unknown_faces/          # Spoof incidents and audit captures
+│   └── embeddings.pkl          # Quality-filtered ArcFace centroids for all students
+├── models/
+│   ├── face_detection_yunet_2023mar.onnx   # OpenCV YuNet face detector model
+│   └── weights/                            # ArcFace neural network weights
+├── src/
+│   ├── anti_spoof.py           # Texture analysis, blur, and pose quality gates
+│   ├── attendance_logic.py     # 10-shot multi-angle attendance engine
+│   ├── database.py             # SQLite schema, HMAC signatures, RBAC queries
 │   ├── detector.py             # OpenCV YuNet DNN detector with 5-point alignment
-│   ├── recognizer.py           # Vectorized ArcFace inference & centroid matching
+│   ├── recognizer.py           # ArcFace inference and centroid cosine matching
 │   └── registration.py         # Multi-shot student dataset registration
 ├── utils/
-│   └── config.py               # Path configurations and global constants
-├── tests/                      # Automated test suites
-│   ├── test_approach_a_isolation.py
-│   └── test_enterprise_security.py
-├── test_admin_portal.py        # Admin portal backend validation tests
-├── gui.py                      # Main CustomTkinter desktop interface
+│   └── config.py               # Central threshold and path configuration
+├── tests/                      # Automated system and security test suites
+├── gui.py                      # Main desktop application interface
 ├── requirements.txt            # Python dependencies
-├── run.bat                     # Windows quick start launcher
+├── run.bat                     # Windows quick launch script
 └── README.md                   # Project documentation
 ```
 
 ---
 
-## ⚙️ Installation & Setup
+## ⚙️ Quick Start Guide
 
-### 1. Prerequisites
-- **Python 3.10 or higher**
-- **Git**
-- Webcam or external camera connected
-
-### 2. Clone the Repository
+### 1. Clone & Setup Environment
 ```bash
 git clone https://github.com/sandeepsagar18/Smart_Ai_class.git
 cd Smart_Ai_class
-```
 
-### 3. Create a Virtual Environment
-```bash
-# Windows
+# Create virtual environment
 python -m venv venv
+
+# Activate virtual environment (Windows)
 venv\Scripts\activate
 
-# macOS / Linux
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 4. Install Dependencies
-```bash
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 5. Launch the Application
+### 2. Run the Application
 ```bash
 python gui.py
 ```
-*(On Windows, you can also double-click `run.bat`)*
+*(Or double-click `run.bat` on Windows)*
 
 ---
 
-## 🔑 Default Credentials & Quick Start
+## 🔑 Default Credentials
 
-Upon first run, the database automatically initializes a default Administrator account:
+On initial startup, the database creates a default administrative account:
 
-| Account Type | Employee ID | Default Password |
+| Role | Employee ID | Default Password |
 | :--- | :--- | :--- |
 | **System Administrator** | `ADMIN01` | `admin123` |
 
-> ⚠️ **Security Notice**: Change the default administrator password immediately after initial login via the session bar. Default Admin Master Key for creating new admin accounts: `SmartClass@Admin#2026`.
-
----
-
-## 🧪 Running Automated Tests
-
-Run the backend test suites to verify database operations, RBAC isolation, anti-spoofing, and attendance integrity:
-
-```bash
-# Run Admin Portal verification tests
-python test_admin_portal.py
-
-# Run Security & Anti-Spoofing tests
-python tests/test_enterprise_security.py
-
-# Run Section Isolation tests
-python tests/test_approach_a_isolation.py
-```
+> ⚠️ **Note**: Change the default admin password after initial login. Master Key for registering new admin accounts: `SmartClass@Admin#2026`.
 
 ---
 
@@ -171,5 +128,4 @@ Developed & Maintained by **Sandeep Sagar**
 ---
 
 ## 📄 License
-
 This project is licensed under the MIT License - see the LICENSE file for details.
