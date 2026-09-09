@@ -33,7 +33,7 @@ AMBIGUITY_MARGIN = 0.06          # Minimum separation between top-1 and top-2 ca
 
 # Temporal Consensus & Attendance Logic
 TOTAL_CAPTURE_SHOTS = 7          # Total multi-angle shots per session
-REQUIRED_CONSISTENT_VOTES = 5    # Required matching votes out of total shots (5 of 7)
+REQUIRED_CONSISTENT_VOTES = 3    # Required matching votes out of total shots (3 of 7)
 SHOT_COUNTDOWN_SECONDS = 1.2     # Countdown interval between shots
 
 # Features

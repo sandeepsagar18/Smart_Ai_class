@@ -2543,7 +2543,17 @@ class SmartClassApp(ctk.CTk):
     def _camera_finished(self, result, subject_info):
         if hasattr(self, 'btn_attendance') and self.btn_attendance:
             self.btn_attendance.configure(text="BATCH CLASS SCAN", state="normal")
+
+        # Auto-switch the roster dropdown to the subject that was just scanned
+        if subject_info and hasattr(self, 'subject_map'):
+            sub_id = subject_info.get("id")
+            for opt_key, s_data in self.subject_map.items():
+                if s_data.get("id") == sub_id:
+                    self.roster_subject_var.set(opt_key)
+                    break
+
         self.refresh_dashboard_metrics()
+        self.populate_roster()
 
         if isinstance(result, dict) and "error" in result:
             self.show_error("Scan Error", result["error"])

@@ -320,7 +320,9 @@ def start_attendance(subject_info=None):
                     "roll": s_roll, "name": s_name, "enrolled": f"{s_degree} {s_year} {s_branch} Sec {s_section}"
                 })
         else:
-            print(f"[REJECTED - INSUFFICIENT CONSENSUS] {s_name} ({s_roll}): Votes={count}/{NUM_SHOTS} (Required: {REQUIRED_MATCHES}), Avg Sim={avg_similarity:.3f} (Required: {ARCFACE_SIMILARITY_THRESHOLD}) -> Attendance denied.")
+            # Only report insufficient consensus if the student is actually enrolled in this target class/section
+            if is_correct_section:
+                print(f"[REJECTED - INSUFFICIENT CONSENSUS] {s_name} ({s_roll}): Votes={count}/{NUM_SHOTS} (Required: {REQUIRED_MATCHES}), Avg Sim={avg_similarity:.3f} (Required: {ARCFACE_SIMILARITY_THRESHOLD}) -> Attendance denied.")
 
 
     filename = None
