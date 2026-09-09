@@ -226,9 +226,15 @@ def start_attendance(subject_info=None):
                     today_date, timestamp, "Present"
                 )
             else:
-                print(f"[REJECTED - WRONG SECTION] Student {s_name} ({s_roll}) is enrolled in {s_branch} Sec {s_section}, NOT target {target_branch} Sec {target_section}! Attendance denied.")
+                mismatch_reasons = []
+                if not match_degree: mismatch_reasons.append(f"Degree '{s_degree}' != target '{target_degree}'")
+                if not match_year: mismatch_reasons.append(f"Year '{s_year}' != target '{target_year}'")
+                if not match_branch: mismatch_reasons.append(f"Branch '{s_branch}' != target '{target_branch}'")
+                if not match_section: mismatch_reasons.append(f"Section '{s_section}' != target '{target_section}'")
+                reason_str = ", ".join(mismatch_reasons)
+                print(f"[REJECTED - WRONG CLASS/SECTION] Student {s_name} ({s_roll}) [{s_degree} {s_year} {s_branch} Sec {s_section}] does not match target class [{target_degree} {target_year} {target_branch} Sec {target_section}]! ({reason_str}). Attendance denied.")
                 rejected_wrong_section.append({
-                    "roll": s_roll, "name": s_name, "enrolled": f"{s_branch} {s_section}"
+                    "roll": s_roll, "name": s_name, "enrolled": f"{s_degree} {s_year} {s_branch} Sec {s_section}"
                 })
         else:
             print(f"[REJECTED - LOW MATCHES] {s_name} ({s_roll}) only detected in {count}/{NUM_SHOTS} shots -> Glitch discarded.")
