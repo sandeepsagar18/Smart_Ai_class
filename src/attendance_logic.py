@@ -176,6 +176,13 @@ def start_attendance(subject_info=None):
                                    f"Biometric spoof rejected in {sub_code} ({l_reason}, Score: {l_score}%). Snapshot: {spoof_path.name}")
                 continue
 
+            # Quality check: Discard motion-blurred crops to prevent false identification
+            face_gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
+            sharpness = cv2.Laplacian(face_gray, cv2.CV_64F).var()
+            if sharpness < 180.0:
+                print(f"[QUALITY ALERT] Discarding blurry face crop (Sharpness: {sharpness:.1f} < 180.0)")
+                continue
+
             valid_live_crops.append(face_crop)
 
         # High-Speed Vectorized Batch ArcFace Inference per shot with section-awareness

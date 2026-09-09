@@ -76,32 +76,18 @@ class FaceRecognizer:
         best_match = "Unknown"
         best_distance = float("inf")
 
-        # Prioritize section candidates if available
-        search_centroids = self.centroids
-        if candidate_rolls:
-            candidate_set = set(map(str, candidate_rolls))
-            # First pass: check section candidates
-            for roll in candidate_set:
-                if roll in self.centroids:
-                    c_dist = 1.0 - float(np.dot(live_norm, self.centroids[roll]))
-                    if c_dist < best_distance:
-                        best_distance = c_dist
-                        best_match = roll
-
-            if best_distance < self.threshold:
-                confidence = round((1 - (best_distance / self.threshold)) * 100, 2)
-                return best_match, confidence
-
-        # Full database scan if not resolved
-        for roll_number, centroid in search_centroids.items():
+        # 1. Global unconstrained matching across all known centroids
+        for roll_number, centroid in self.centroids.items():
             c_dist = 1.0 - float(np.dot(live_norm, centroid))
             if c_dist < best_distance:
                 best_distance = c_dist
                 best_match = roll_number
 
+        # 2. Strict threshold gating - must be a genuinely close face match
         if best_distance < self.threshold:
             confidence = round((1 - (best_distance / self.threshold)) * 100, 2)
             return best_match, confidence
+
         return "Unknown", 0.0
 
     def recognize(self, face_crop, candidate_rolls=None):
