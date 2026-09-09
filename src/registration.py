@@ -145,18 +145,18 @@ def register_student(roll_number, name, gender, degree, year, branch, section):
             light_pass = (50 <= avg_brightness <= 210)
 
             # 3. Face Resolution / Distance Check (Min face width)
-            size_pass = fw >= 110 and fh >= 110
+            size_pass = fw >= 70 and fh >= 70
 
             # 4. Center Alignment Check (Face not cut at edges)
-            margin = 25
-            pos_pass = (fx1 > margin and fy1 > margin and fx2 < (w - margin) and fy2 < (h - margin))
+            margin = 15
+            pos_pass = (fx1 >= margin and fy1 >= margin and fx2 <= (w - margin) and fy2 <= (h - margin))
 
             # Composite quality determination
             if not size_pass:
                 quality_msg = "Come Closer: Face too small in frame"
                 color = (0, 165, 255)
             elif not light_pass:
-                if avg_brightness < 50:
+                if avg_brightness < 45:
                     quality_msg = "Poor Lighting: Face too dark! Move into better light"
                 else:
                     quality_msg = "Overexposed: Too much harsh light on face"
