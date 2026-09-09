@@ -154,6 +154,8 @@ def start_attendance(subject_info=None):
     for f_idx, frame in enumerate(captured_frames):
         processed_frame, cropped_faces = detector.detect_faces(frame)
         print(f"[SHOT {f_idx + 1}] Detected {len(cropped_faces)} faces in frame")
+
+        valid_live_crops = []
         for face_data in cropped_faces:
             face_crop = face_data["image"]
 
@@ -170,11 +172,15 @@ def start_attendance(subject_info=None):
                                    f"Biometric spoof rejected in {sub_code} ({l_reason}, Score: {l_score}%). Snapshot: {spoof_path.name}")
                 continue
 
-            # Prioritize matching against enrolled students of this section first!
-            roll_number, confidence = recognizer.recognize(face_crop, candidate_rolls=enrolled_roll_numbers)
-            if roll_number != "Unknown":
-                student_detections[roll_number] = student_detections.get(roll_number, 0) + 1
-                print(f"   -> Identified {roll_number} (Conf={confidence}%)")
+            valid_live_crops.append(face_crop)
+
+        # High-Speed Vectorized Batch ArcFace Inference per shot
+        if valid_live_crops:
+            batch_matches = recognizer.recognize_batch(valid_live_crops)
+            for roll_number, confidence in batch_matches:
+                if roll_number != "Unknown":
+                    student_detections[roll_number] = student_detections.get(roll_number, 0) + 1
+                    print(f"   -> Identified {roll_number} (Conf={confidence}%)")
 
     cv2.destroyAllWindows()
 

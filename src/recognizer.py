@@ -14,11 +14,22 @@ class FaceRecognizer:
     def __init__(self):
         self.model_name = "ArcFace"
         self.known_embeddings = {}
+        self.centroids = {}
         self.threshold = 0.35
 
         if EMBEDDINGS_FILE.exists():
             with open(EMBEDDINGS_FILE, "rb") as f:
                 self.known_embeddings = pickle.load(f)
+            self._compute_centroids()
+
+    def _compute_centroids(self):
+        self.centroids = {}
+        for roll, embs in self.known_embeddings.items():
+            if not embs: continue
+            normed = [np.array(e) / (np.linalg.norm(e) + 1e-10) for e in embs]
+            c = np.mean(normed, axis=0)
+            c = c / (np.linalg.norm(c) + 1e-10)
+            self.centroids[roll] = c
 
     def train_system(self):
         print(f"\n[INFO] Training High-Definition {self.model_name} Engine...")
@@ -44,10 +55,40 @@ class FaceRecognizer:
             pickle.dump(embeddings_dict, f)
 
         self.known_embeddings = embeddings_dict
-        print(f"[SUCCESS] Training complete! Loaded {len(self.known_embeddings)} students into HD memory.")
+        self._compute_centroids()
+        print(f"[SUCCESS] Training complete! Loaded {len(self.known_embeddings)} students with centroid profiles into HD memory.")
+
+    def _match_single_embedding(self, live_embedding):
+        live_norm = live_embedding / (np.linalg.norm(live_embedding) + 1e-10)
+        best_match = "Unknown"
+        best_distance = float("inf")
+
+        for roll_number, centroid in self.centroids.items():
+            # 1. Compare against master centroid vector
+            c_dist = 1.0 - float(np.dot(live_norm, centroid))
+            
+            # 2. Also check individual pose variations for side tilts
+            min_pose_dist = c_dist
+            if roll_number in self.known_embeddings:
+                for saved_emb in self.known_embeddings[roll_number]:
+                    saved_norm = np.array(saved_emb) / (np.linalg.norm(saved_emb) + 1e-10)
+                    p_dist = 1.0 - float(np.dot(live_norm, saved_norm))
+                    if p_dist < min_pose_dist:
+                        min_pose_dist = p_dist
+
+            # Blend centroid and closest pose for optimal robustness
+            effective_dist = min(c_dist, min_pose_dist)
+            if effective_dist < best_distance:
+                best_distance = effective_dist
+                best_match = roll_number
+
+        if best_distance < self.threshold:
+            confidence = round((1 - (best_distance / self.threshold)) * 100, 2)
+            return best_match, confidence
+        return "Unknown", 0.0
 
     def recognize(self, face_crop, candidate_rolls=None):
-        if not self.known_embeddings:
+        if not self.centroids:
             return "Unknown", 0.0
         try:
             if face_crop.shape[0] < 20 or face_crop.shape[1] < 20:
@@ -57,27 +98,37 @@ class FaceRecognizer:
             if len(res) == 0: return "Unknown", 0.0
 
             live_embedding = np.array(res[0]["embedding"])
-            best_match = "Unknown"
-            best_distance = float("inf")
-
-            # Compare against the full known embedding library fairly
-            for roll_number, saved_embeddings in self.known_embeddings.items():
-                for saved_emb in saved_embeddings:
-                    saved_emb = np.array(saved_emb)
-                    distance = np.dot(live_embedding, saved_emb) / (
-                                np.linalg.norm(live_embedding) * np.linalg.norm(saved_emb))
-                    cosine_distance = 1 - distance
-
-                    if cosine_distance < best_distance:
-                        best_distance = cosine_distance
-                        best_match = roll_number
-
-            # ArcFace cosine distance threshold (strictly <= 0.35)
-            if best_distance < self.threshold:
-                confidence = round((1 - (best_distance / self.threshold)) * 100, 2)
-                return best_match, confidence
-            else:
-                return "Unknown", 0.0
-
-        except Exception as e:
+            return self._match_single_embedding(live_embedding)
+        except Exception:
             return "Unknown", 0.0
+
+    def recognize_batch(self, face_crops):
+        """
+        Batch vectorized ArcFace inference:
+        Processes multiple face crops in a single forward pass for high-speed crowd attendance.
+        """
+        if not face_crops or not self.centroids:
+            return [("Unknown", 0.0)] * len(face_crops)
+        try:
+            valid_indices = []
+            valid_crops = []
+            for idx, crop in enumerate(face_crops):
+                if crop.shape[0] >= 20 and crop.shape[1] >= 20:
+                    valid_indices.append(idx)
+                    valid_crops.append(crop)
+
+            if not valid_crops:
+                return [("Unknown", 0.0)] * len(face_crops)
+
+            # Single batch forward pass through ArcFace
+            batch_results = DeepFace.represent(valid_crops, model_name=self.model_name, enforce_detection=False)
+            
+            output = [("Unknown", 0.0)] * len(face_crops)
+            for res_idx, orig_idx in enumerate(valid_indices):
+                if res_idx < len(batch_results):
+                    emb = np.array(batch_results[res_idx]["embedding"])
+                    output[orig_idx] = self._match_single_embedding(emb)
+            return output
+        except Exception:
+            # Fallback to single recognition on error
+            return [self.recognize(c) for c in face_crops]
