@@ -125,9 +125,15 @@ def start_attendance(subject_info=None):
             cv2.imwrite(str(CLASS_PHOTOS_DIR / photo_name), frame)
             print(f"[CAPTURE] Secured High-Res Image: {photo_name}")
 
-            flash = np.ones(frame.shape, dtype="uint8") * 255
-            cv2.imshow("SmartClass Vision - Section Attendance Scan", flash)
-            cv2.waitKey(150)
+            # Elegant capture visual confirmation (no harsh all-white flash screen)
+            feedback_frame = frame.copy()
+            cv2.rectangle(feedback_frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 255, 0), 10)
+            cv2.rectangle(feedback_frame, (frame.shape[1] // 2 - 280, 20), (frame.shape[1] // 2 + 280, 85), (20, 20, 20), -1)
+            cv2.rectangle(feedback_frame, (frame.shape[1] // 2 - 280, 20), (frame.shape[1] // 2 + 280, 85), (0, 255, 0), 2)
+            cv2.putText(feedback_frame, f"SHOT {i + 1}/{NUM_SHOTS} SECURED", (frame.shape[1] // 2 - 210, 62),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)
+            cv2.imshow("SmartClass Vision - Section Attendance Scan", feedback_frame)
+            cv2.waitKey(100)
 
     cap.release()
 
