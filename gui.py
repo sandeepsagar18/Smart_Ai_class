@@ -1022,10 +1022,13 @@ class SmartClassApp(ctk.CTk):
         self.show_info("Success", "AI Recognizer Model trained successfully!")
 
     # AUTHENTICATION WINDOW (LOGIN & SECURE REGISTRATION)
-    def open_auth_window(self, default_tab="Teacher Login"):
+    # AUTHENTICATION WINDOW (ROLE-ISOLATED: TEACHER ONLY OR ADMIN ONLY)
+    def open_auth_window(self, mode="teacher", default_tab=None):
         auth_win = ctk.CTkToplevel(self)
-        auth_win.title("SmartClass Vision - Authentication")
-        auth_win.geometry("540x630")
+        is_admin_mode = (mode == "admin" or default_tab in ["Admin Login", "Create Admin"])
+        role_title = "Administrator Portal" if is_admin_mode else "Faculty Portal"
+        auth_win.title(f"SmartClass Vision - {role_title}")
+        auth_win.geometry("520x620")
         auth_win.resizable(False, False)
         auth_win.transient(self)
         auth_win.lift()
@@ -1041,231 +1044,235 @@ class SmartClassApp(ctk.CTk):
 
         tabs = ctk.CTkTabview(auth_win)
         tabs.pack(fill="both", expand=True, padx=15, pady=15)
-        tab_teacher_login = tabs.add("Teacher Login")
-        tab_teacher_signup = tabs.add("Create Teacher")
-        tab_admin_login = tabs.add("Admin Login")
-        tab_admin_signup = tabs.add("Create Admin")
 
-        if default_tab in ["Teacher Login", "Create Teacher", "Admin Login", "Create Admin"]:
-            tabs.set(default_tab)
+        if not is_admin_mode:
+            # ====================================================
+            # TEACHER PORTAL ONLY: Teacher Login & Create Teacher
+            # ====================================================
+            tab_teacher_login = tabs.add("Teacher Login")
+            tab_teacher_signup = tabs.add("Create Teacher")
 
-        # ----------------------------------------------------
-        # TAB 1: TEACHER LOGIN
-        # ----------------------------------------------------
-        ctk.CTkLabel(tab_teacher_login, text="👨‍🏫 Teacher / Faculty Login", font=ctk.CTkFont(size=19, weight="bold"), text_color="#38bdf8").pack(pady=(16, 6))
-        ctk.CTkLabel(tab_teacher_login, text="Enter your Faculty Employee ID and password to mark attendance.",
-                     font=ctk.CTkFont(size=11), text_color="gray", wraplength=420, justify="center").pack(pady=(0, 16))
+            # TAB 1: TEACHER LOGIN
+            ctk.CTkLabel(tab_teacher_login, text="👨‍🏫 Teacher / Faculty Login", font=ctk.CTkFont(size=20, weight="bold"), text_color="#38bdf8").pack(pady=(22, 6))
+            ctk.CTkLabel(tab_teacher_login, text="Enter your Faculty Employee ID and password to access attendance.",
+                         font=ctk.CTkFont(size=12), text_color="gray", wraplength=400, justify="center").pack(pady=(0, 20))
 
-        t_login_emp = ctk.CTkEntry(tab_teacher_login, placeholder_text="Employee ID (e.g. EMP101)", width=320)
-        t_login_emp.pack(pady=8)
-        t_login_pwd = ctk.CTkEntry(tab_teacher_login, placeholder_text="Password", show="*", width=320)
-        t_login_pwd.pack(pady=8)
+            t_login_emp = ctk.CTkEntry(tab_teacher_login, placeholder_text="Employee ID (e.g. EMP101)", width=320)
+            t_login_emp.pack(pady=10)
+            t_login_pwd = ctk.CTkEntry(tab_teacher_login, placeholder_text="Password", show="*", width=320)
+            t_login_pwd.pack(pady=10)
 
-        def do_teacher_login():
-            emp = t_login_emp.get().strip()
-            pwd = t_login_pwd.get()
-            if not emp or not pwd:
-                self.show_error("Error", "Please enter Employee ID and Password!", parent=auth_win)
-                return
-
-            ok, msg, user = authenticate_teacher(emp, pwd)
-            if ok:
-                self.current_user = user
-                self.last_user_activity = time.time()
-                self.update_session_display()
-                self.refresh_dashboard_metrics()
-                on_close()
-                self.show_info("Login Successful", f"Welcome, {user['name']}!\nAuthenticated as [{user['role'].upper()}].", parent=self)
-            else:
-                self.show_error("Login Failed", msg, parent=auth_win)
-
-        t_login_pwd.bind("<Return>", lambda _: do_teacher_login())
-        ctk.CTkButton(tab_teacher_login, text="Login as Teacher", command=do_teacher_login,
-                      fg_color="#006400", hover_color="#008000", height=38, width=320,
-                      font=ctk.CTkFont(weight="bold")).pack(pady=18)
-
-        # Quick Switch helper
-        switch_to_create_t = ctk.CTkButton(tab_teacher_login, text="Don't have a Teacher account? Create Teacher here",
-                                           fg_color="transparent", text_color="#38bdf8", hover_color="#1e293b",
-                                           font=ctk.CTkFont(size=11, underline=True),
-                                           command=lambda: tabs.set("Create Teacher"))
-        switch_to_create_t.pack(pady=(0, 10))
-
-        # ----------------------------------------------------
-        # TAB 2: CREATE TEACHER
-        # ----------------------------------------------------
-        ctk.CTkLabel(tab_teacher_signup, text="📝 Register New Teacher Account", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=(12, 4))
-        ctk.CTkLabel(tab_teacher_signup, text="Faculty members can create an account and access class attendance.",
-                     font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(0, 10))
-
-        t_sign_emp = ctk.CTkEntry(tab_teacher_signup, placeholder_text="Employee ID (e.g. EMP-101)", width=320)
-        t_sign_emp.pack(pady=4)
-        t_sign_name = ctk.CTkEntry(tab_teacher_signup, placeholder_text="Full Name (e.g. Dr. K. Sharma)", width=320)
-        t_sign_name.pack(pady=4)
-
-        t_dept_var = ctk.StringVar(value="CSE")
-        ctk.CTkOptionMenu(tab_teacher_signup, variable=t_dept_var,
-                          values=["CSE", "IT", "ECE", "ELECTRICAL", "MECHANICAL", "CHEMICAL", "CIVIL"],
-                          width=320).pack(pady=4)
-
-        t_sign_email = ctk.CTkEntry(tab_teacher_signup, placeholder_text="Email Address (Optional)", width=320)
-        t_sign_email.pack(pady=4)
-
-        t_sign_pwd = ctk.CTkEntry(tab_teacher_signup, placeholder_text="Password (Min 6 characters)", show="*", width=320)
-        t_sign_pwd.pack(pady=4)
-        t_sign_pwd_conf = ctk.CTkEntry(tab_teacher_signup, placeholder_text="Confirm Password", show="*", width=320)
-        t_sign_pwd_conf.pack(pady=4)
-
-        def do_register_teacher():
-            emp = t_sign_emp.get().strip()
-            name = t_sign_name.get().strip()
-            dept = t_dept_var.get()
-            email = t_sign_email.get().strip()
-            pwd = t_sign_pwd.get()
-            pwd_conf = t_sign_pwd_conf.get()
-
-            if not emp or not name or not pwd:
-                self.show_error("Error", "Employee ID, Name, and Password are required!", parent=auth_win)
-                return
-            if pwd != pwd_conf:
-                self.show_error("Error", "Passwords do not match!", parent=auth_win)
-                return
-            if len(pwd) < 6:
-                self.show_error("Error", "Password must be at least 6 characters long!", parent=auth_win)
-                return
-
-            ok, msg, tid = register_teacher_secure(emp, name, dept, email, pwd, role="teacher")
-            if ok:
-                self.show_info("Account Created", f"Teacher account created securely for {name}!\nYou can now log in.", parent=auth_win)
-                tabs.set("Teacher Login")
-                t_login_emp.delete(0, 'end')
-                t_login_emp.insert(0, emp)
-                t_login_pwd.delete(0, 'end')
-            else:
-                self.show_error("Registration Failed", msg, parent=auth_win)
-
-        ctk.CTkButton(tab_teacher_signup, text="Create Teacher Account", command=do_register_teacher,
-                      fg_color="#1f538d", hover_color="#14375e", height=36, width=320,
-                      font=ctk.CTkFont(weight="bold")).pack(pady=12)
-
-        # ----------------------------------------------------
-        # TAB 3: ADMIN LOGIN
-        # ----------------------------------------------------
-        ctk.CTkLabel(tab_admin_login, text="🛡️ System Administrator Login", font=ctk.CTkFont(size=19, weight="bold"), text_color="#c084fc").pack(pady=(16, 6))
-        ctk.CTkLabel(tab_admin_login, text="Institutional administrative console access & student governance.",
-                     font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(0, 16))
-
-        a_login_emp = ctk.CTkEntry(tab_admin_login, placeholder_text="Admin ID (Default: ADMIN01)", width=320)
-        a_login_emp.pack(pady=8)
-        a_login_pwd = ctk.CTkEntry(tab_admin_login, placeholder_text="Admin Password (Default: admin123)", show="*", width=320)
-        a_login_pwd.pack(pady=8)
-
-        def do_admin_login():
-            emp = a_login_emp.get().strip()
-            pwd = a_login_pwd.get()
-            if not emp or not pwd:
-                self.show_error("Error", "Please enter Admin ID and Password!", parent=auth_win)
-                return
-
-            ok, msg, user = authenticate_teacher(emp, pwd)
-            if ok:
-                if user.get("role") != "admin":
-                    self.show_error("Access Denied", f"Account {emp} is a Teacher account, not an Administrator.\nPlease use Teacher Login.", parent=auth_win)
+            def do_teacher_login():
+                emp = t_login_emp.get().strip()
+                pwd = t_login_pwd.get()
+                if not emp or not pwd:
+                    self.show_error("Error", "Please enter Employee ID and Password!", parent=auth_win)
                     return
-                self.current_user = user
-                self.last_user_activity = time.time()
-                self.update_session_display()
-                self.refresh_dashboard_metrics()
-                on_close()
-                self.show_info("Login Successful", f"Welcome, Admin {user['name']}!\nMaster Control Suite Activated.", parent=self)
+
+                ok, msg, user = authenticate_teacher(emp, pwd)
+                if ok:
+                    self.current_user = user
+                    self.last_user_activity = time.time()
+                    self.update_session_display()
+                    self.refresh_dashboard_metrics()
+                    on_close()
+                    self.show_info("Login Successful", f"Welcome, {user['name']}!\nAuthenticated as [{user['role'].upper()}].", parent=self)
+                else:
+                    self.show_error("Login Failed", msg, parent=auth_win)
+
+            t_login_pwd.bind("<Return>", lambda _: do_teacher_login())
+            ctk.CTkButton(tab_teacher_login, text="Login as Teacher", command=do_teacher_login,
+                          fg_color="#006400", hover_color="#008000", height=40, width=320,
+                          font=ctk.CTkFont(weight="bold")).pack(pady=22)
+
+            ctk.CTkButton(tab_teacher_login, text="Don't have a Teacher account? Create Teacher here",
+                          fg_color="transparent", text_color="#38bdf8", hover_color="#1e293b",
+                          font=ctk.CTkFont(size=11, underline=True),
+                          command=lambda: tabs.set("Create Teacher")).pack(pady=(0, 10))
+
+            # TAB 2: CREATE TEACHER
+            ctk.CTkLabel(tab_teacher_signup, text="📝 Register New Teacher Account", font=ctk.CTkFont(size=19, weight="bold")).pack(pady=(12, 4))
+            ctk.CTkLabel(tab_teacher_signup, text="Create a new faculty account to manage classroom attendance.",
+                         font=ctk.CTkFont(size=11), text_color="gray").pack(pady=(0, 10))
+
+            t_sign_emp = ctk.CTkEntry(tab_teacher_signup, placeholder_text="Employee ID (e.g. EMP-101)", width=320)
+            t_sign_emp.pack(pady=4)
+            t_sign_name = ctk.CTkEntry(tab_teacher_signup, placeholder_text="Full Name (e.g. Dr. K. Sharma)", width=320)
+            t_sign_name.pack(pady=4)
+
+            t_dept_var = ctk.StringVar(value="CSE")
+            ctk.CTkOptionMenu(tab_teacher_signup, variable=t_dept_var,
+                              values=["CSE", "IT", "ECE", "ELECTRICAL", "MECHANICAL", "CHEMICAL", "CIVIL"],
+                              width=320).pack(pady=4)
+
+            t_sign_email = ctk.CTkEntry(tab_teacher_signup, placeholder_text="Email Address (Optional)", width=320)
+            t_sign_email.pack(pady=4)
+
+            t_sign_pwd = ctk.CTkEntry(tab_teacher_signup, placeholder_text="Password (Min 6 characters)", show="*", width=320)
+            t_sign_pwd.pack(pady=4)
+            t_sign_pwd_conf = ctk.CTkEntry(tab_teacher_signup, placeholder_text="Confirm Password", show="*", width=320)
+            t_sign_pwd_conf.pack(pady=4)
+
+            def do_register_teacher():
+                emp = t_sign_emp.get().strip()
+                name = t_sign_name.get().strip()
+                dept = t_dept_var.get()
+                email = t_sign_email.get().strip()
+                pwd = t_sign_pwd.get()
+                pwd_conf = t_sign_pwd_conf.get()
+
+                if not emp or not name or not pwd:
+                    self.show_error("Error", "Employee ID, Name, and Password are required!", parent=auth_win)
+                    return
+                if pwd != pwd_conf:
+                    self.show_error("Error", "Passwords do not match!", parent=auth_win)
+                    return
+                if len(pwd) < 6:
+                    self.show_error("Error", "Password must be at least 6 characters long!", parent=auth_win)
+                    return
+
+                ok, msg, tid = register_teacher_secure(emp, name, dept, email, pwd, role="teacher")
+                if ok:
+                    self.show_info("Account Created", f"Teacher account created securely for {name}!\nYou can now log in.", parent=auth_win)
+                    tabs.set("Teacher Login")
+                    t_login_emp.delete(0, 'end')
+                    t_login_emp.insert(0, emp)
+                    t_login_pwd.delete(0, 'end')
+                else:
+                    self.show_error("Registration Failed", msg, parent=auth_win)
+
+            ctk.CTkButton(tab_teacher_signup, text="Create Teacher Account", command=do_register_teacher,
+                          fg_color="#1f538d", hover_color="#14375e", height=38, width=320,
+                          font=ctk.CTkFont(weight="bold")).pack(pady=12)
+
+            if default_tab == "Create Teacher":
+                tabs.set("Create Teacher")
             else:
-                self.show_error("Login Failed", msg, parent=auth_win)
+                tabs.set("Teacher Login")
 
-        a_login_pwd.bind("<Return>", lambda _: do_admin_login())
-        ctk.CTkButton(tab_admin_login, text="Login as Administrator", command=do_admin_login,
-                      fg_color="#5a189a", hover_color="#7b2cbf", height=38, width=320,
-                      font=ctk.CTkFont(weight="bold")).pack(pady=16)
+        else:
+            # ====================================================
+            # ADMIN PORTAL ONLY: Admin Login & Create Admin
+            # ====================================================
+            tab_admin_login = tabs.add("Admin Login")
+            tab_admin_signup = tabs.add("Create Admin")
 
-        # Quick Switch helper
-        switch_to_create_a = ctk.CTkButton(tab_admin_login, text="Don't have an Admin account? Create Admin here",
-                                           fg_color="transparent", text_color="#c084fc", hover_color="#1e293b",
-                                           font=ctk.CTkFont(size=11, underline=True),
-                                           command=lambda: tabs.set("Create Admin"))
-        switch_to_create_a.pack(pady=(0, 10))
+            # TAB 1: ADMIN LOGIN
+            ctk.CTkLabel(tab_admin_login, text="🛡️ System Administrator Login", font=ctk.CTkFont(size=20, weight="bold"), text_color="#c084fc").pack(pady=(22, 6))
+            ctk.CTkLabel(tab_admin_login, text="Institutional administration console & student management control.",
+                         font=ctk.CTkFont(size=12), text_color="gray").pack(pady=(0, 20))
 
-        # ----------------------------------------------------
-        # TAB 4: CREATE ADMIN
-        # ----------------------------------------------------
-        ctk.CTkLabel(tab_admin_signup, text="🛡️ Register Administrator Account", font=ctk.CTkFont(size=18, weight="bold"), text_color="#e0aaff").pack(pady=(8, 2))
-        ctk.CTkLabel(tab_admin_signup, text="Create a new Admin account or set up your master administrator.",
-                     font=ctk.CTkFont(size=11), text_color="#cbd5e1").pack(pady=(0, 8))
+            a_login_emp = ctk.CTkEntry(tab_admin_login, placeholder_text="Admin ID (Default: ADMIN01)", width=320)
+            a_login_emp.pack(pady=10)
+            a_login_pwd = ctk.CTkEntry(tab_admin_login, placeholder_text="Admin Password (Default: admin123)", show="*", width=320)
+            a_login_pwd.pack(pady=10)
 
-        a_sign_emp = ctk.CTkEntry(tab_admin_signup, placeholder_text="Admin Employee ID (e.g. ADMIN02)", width=320)
-        a_sign_emp.pack(pady=3)
-        a_sign_name = ctk.CTkEntry(tab_admin_signup, placeholder_text="Administrator Full Name", width=320)
-        a_sign_name.pack(pady=3)
+            def do_admin_login():
+                emp = a_login_emp.get().strip()
+                pwd = a_login_pwd.get()
+                if not emp or not pwd:
+                    self.show_error("Error", "Please enter Admin ID and Password!", parent=auth_win)
+                    return
 
-        a_sign_email = ctk.CTkEntry(tab_admin_signup, placeholder_text="Institutional Email (Optional)", width=320)
-        a_sign_email.pack(pady=3)
+                ok, msg, user = authenticate_teacher(emp, pwd)
+                if ok:
+                    if user.get("role") != "admin":
+                        self.show_error("Access Denied", f"Account '{emp}' does not have Administrator privileges.\nPlease log in through Teacher Login.", parent=auth_win)
+                        return
+                    self.current_user = user
+                    self.last_user_activity = time.time()
+                    self.update_session_display()
+                    self.refresh_dashboard_metrics()
+                    on_close()
+                    self.show_info("Login Successful", f"Welcome, Admin {user['name']}!\nMaster Control Suite Activated.", parent=self)
+                else:
+                    self.show_error("Login Failed", msg, parent=auth_win)
 
-        a_sign_pwd = ctk.CTkEntry(tab_admin_signup, placeholder_text="Admin Password (Min 6 chars)", show="*", width=320)
-        a_sign_pwd.pack(pady=3)
-        a_sign_pwd_conf = ctk.CTkEntry(tab_admin_signup, placeholder_text="Confirm Admin Password", show="*", width=320)
-        a_sign_pwd_conf.pack(pady=3)
+            a_login_pwd.bind("<Return>", lambda _: do_admin_login())
+            ctk.CTkButton(tab_admin_login, text="Login as Administrator", command=do_admin_login,
+                          fg_color="#5a189a", hover_color="#7b2cbf", height=40, width=320,
+                          font=ctk.CTkFont(weight="bold")).pack(pady=20)
 
-        # Master Key frame with clear hint
-        master_box = ctk.CTkFrame(tab_admin_signup, fg_color="#2b0938", corner_radius=8)
-        master_box.pack(pady=4, padx=20, fill="x")
-        master_key_entry = ctk.CTkEntry(master_box, placeholder_text="🔑 Admin Master Authorization Key", show="*", width=300)
-        master_key_entry.pack(pady=(6, 2), padx=10)
-        lbl_master_desc = ctk.CTkLabel(
-            master_box,
-            text="Master Key (Default: SmartClass@Admin#2026)",
-            font=ctk.CTkFont(size=11, weight="bold"),
-            text_color="#f0abfc"
-        )
-        lbl_master_desc.pack(pady=(0, 6))
+            ctk.CTkButton(tab_admin_login, text="Don't have an Admin account? Create Admin here",
+                          fg_color="transparent", text_color="#c084fc", hover_color="#1e293b",
+                          font=ctk.CTkFont(size=11, underline=True),
+                          command=lambda: tabs.set("Create Admin")).pack(pady=(0, 10))
 
-        def do_register_admin():
-            emp = a_sign_emp.get().strip()
-            name = a_sign_name.get().strip()
-            email = a_sign_email.get().strip()
-            pwd = a_sign_pwd.get()
-            pwd_conf = a_sign_pwd_conf.get()
+            # TAB 2: CREATE ADMIN
+            ctk.CTkLabel(tab_admin_signup, text="🛡️ Register Administrator Account", font=ctk.CTkFont(size=19, weight="bold"), text_color="#e0aaff").pack(pady=(10, 2))
+            ctk.CTkLabel(tab_admin_signup, text="Create a new administrator profile for system governance.",
+                         font=ctk.CTkFont(size=11), text_color="#cbd5e1").pack(pady=(0, 10))
 
-            if not emp or not name or not pwd:
-                self.show_error("Error", "Admin ID, Name, and Password are required!", parent=auth_win)
-                return
-            if pwd != pwd_conf:
-                self.show_error("Error", "Passwords do not match!", parent=auth_win)
-                return
-            if len(pwd) < 6:
-                self.show_error("Error", "Password must be at least 6 characters long!", parent=auth_win)
-                return
+            a_sign_emp = ctk.CTkEntry(tab_admin_signup, placeholder_text="Admin Employee ID (e.g. ADMIN02)", width=320)
+            a_sign_emp.pack(pady=4)
+            a_sign_name = ctk.CTkEntry(tab_admin_signup, placeholder_text="Administrator Full Name", width=320)
+            a_sign_name.pack(pady=4)
 
-            candidate_key = master_key_entry.get().strip()
-            if not candidate_key:
-                self.show_error("Authorization Key Required",
-                                "Admin Master Authorization Key is required!\nDefault key: SmartClass@Admin#2026", parent=auth_win)
-                return
-            if not verify_admin_master_key(candidate_key):
-                self.show_error("Authorization Denied",
-                                "Invalid Admin Master Authorization Key!\n(Default: SmartClass@Admin#2026)", parent=auth_win)
-                return
+            a_sign_email = ctk.CTkEntry(tab_admin_signup, placeholder_text="Institutional Email (Optional)", width=320)
+            a_sign_email.pack(pady=4)
 
-            ok, msg, tid = register_teacher_secure(emp, name, "ADMINISTRATION", email, pwd, role="admin")
-            if ok:
-                self.show_info("Admin Account Created", f"Administrator account created securely for {name}!\nYou can now log in.", parent=auth_win)
+            a_sign_pwd = ctk.CTkEntry(tab_admin_signup, placeholder_text="Admin Password (Min 6 chars)", show="*", width=320)
+            a_sign_pwd.pack(pady=4)
+            a_sign_pwd_conf = ctk.CTkEntry(tab_admin_signup, placeholder_text="Confirm Admin Password", show="*", width=320)
+            a_sign_pwd_conf.pack(pady=4)
+
+            master_box = ctk.CTkFrame(tab_admin_signup, fg_color="#2b0938", corner_radius=8)
+            master_box.pack(pady=6, padx=20, fill="x")
+            master_key_entry = ctk.CTkEntry(master_box, placeholder_text="🔑 Admin Master Authorization Key", show="*", width=300)
+            master_key_entry.pack(pady=(6, 2), padx=10)
+            lbl_master_desc = ctk.CTkLabel(
+                master_box,
+                text="Master Key (Default: SmartClass@Admin#2026)",
+                font=ctk.CTkFont(size=11, weight="bold"),
+                text_color="#f0abfc"
+            )
+            lbl_master_desc.pack(pady=(0, 6))
+
+            def do_register_admin():
+                emp = a_sign_emp.get().strip()
+                name = a_sign_name.get().strip()
+                email = a_sign_email.get().strip()
+                pwd = a_sign_pwd.get()
+                pwd_conf = a_sign_pwd_conf.get()
+
+                if not emp or not name or not pwd:
+                    self.show_error("Error", "Admin ID, Name, and Password are required!", parent=auth_win)
+                    return
+                if pwd != pwd_conf:
+                    self.show_error("Error", "Passwords do not match!", parent=auth_win)
+                    return
+                if len(pwd) < 6:
+                    self.show_error("Error", "Password must be at least 6 characters long!", parent=auth_win)
+                    return
+
+                candidate_key = master_key_entry.get().strip()
+                if not candidate_key:
+                    self.show_error("Authorization Key Required",
+                                    "Admin Master Authorization Key is required!\nDefault key: SmartClass@Admin#2026", parent=auth_win)
+                    return
+                if not verify_admin_master_key(candidate_key):
+                    self.show_error("Authorization Denied",
+                                    "Invalid Admin Master Authorization Key!\n(Default: SmartClass@Admin#2026)", parent=auth_win)
+                    return
+
+                ok, msg, tid = register_teacher_secure(emp, name, "ADMINISTRATION", email, pwd, role="admin")
+                if ok:
+                    self.show_info("Admin Account Created", f"Administrator account created securely for {name}!\nYou can now log in.", parent=auth_win)
+                    tabs.set("Admin Login")
+                    a_login_emp.delete(0, 'end')
+                    a_login_emp.insert(0, emp)
+                    a_login_pwd.delete(0, 'end')
+                else:
+                    self.show_error("Registration Failed", msg, parent=auth_win)
+
+            ctk.CTkButton(tab_admin_signup, text="Create Admin Account", command=do_register_admin,
+                          fg_color="#5a189a", hover_color="#7b2cbf", height=38, width=320,
+                          font=ctk.CTkFont(weight="bold")).pack(pady=10)
+
+            if default_tab == "Create Admin":
+                tabs.set("Create Admin")
+            else:
                 tabs.set("Admin Login")
-                a_login_emp.delete(0, 'end')
-                a_login_emp.insert(0, emp)
-                a_login_pwd.delete(0, 'end')
-            else:
-                self.show_error("Registration Failed", msg, parent=auth_win)
-
-        ctk.CTkButton(tab_admin_signup, text="Create Admin Account", command=do_register_admin,
-                      fg_color="#5a189a", hover_color="#7b2cbf", height=36, width=320,
-                      font=ctk.CTkFont(weight="bold")).pack(pady=8)
 
     def open_change_password_window(self):
         if not self.require_login():
