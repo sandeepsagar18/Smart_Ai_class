@@ -144,7 +144,14 @@ class FaceRecognizer:
         live_norm = live_embedding / (np.linalg.norm(live_embedding) + 1e-10)
         
         all_similarities = []
-        for roll_number, centroid in self.centroids.items():
+        target_centroids = self.centroids
+        if candidate_rolls:
+            cand_set = set(str(c) for c in candidate_rolls)
+            matched_subset = {r: c for r, c in self.centroids.items() if str(r) in cand_set}
+            if matched_subset:
+                target_centroids = matched_subset
+
+        for roll_number, centroid in target_centroids.items():
             sim = float(np.dot(live_norm, centroid))
             all_similarities.append((roll_number, sim))
 

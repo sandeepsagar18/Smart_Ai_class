@@ -217,7 +217,7 @@ def start_attendance(subject_info=None):
         # STEP 5 & 6: Vectorized Canonical ArcFace Inference with Global Cosine Matching & UNKNOWN Gating
         if valid_live_crops:
             aligned_batch = [item["aligned"] for item in valid_live_crops]
-            batch_matches = recognizer.recognize_batch(aligned_batch)
+            batch_matches = recognizer.recognize_batch(aligned_batch, candidate_rolls=enrolled_roll_numbers)
             for item_idx, match_res in enumerate(batch_matches):
                 roll_number = match_res[0]
                 confidence = match_res[1]
